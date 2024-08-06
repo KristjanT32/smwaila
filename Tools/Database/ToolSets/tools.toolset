@@ -1,0 +1,16 @@
+{
+   "toolList" : [
+      {
+         "name" : "WAILA",
+         "previewRenderable" : "$GAME_DATA/Character/Char_Tools/char_lift_preview.rend", 
+         "previewRotation": [ 1, 0, 0, 0, 0, -1, 0, 1, 0 ],
+         "script" : {
+            "class" : "WAILA",
+            "data" : {},
+            "file" : "$CONTENT_DATA/Scripts/WAILA.lua"
+         },
+         "uuid" : "8c913bba-e625-4084-a088-cd2aff1c937c",
+         "autoTool" : true
+      }
+   ]
+}

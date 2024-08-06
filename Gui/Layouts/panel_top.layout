@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<MyGUI type="Layout" version="3.2.0">
+    <Widget type="Widget" skin="SMButton" position_real="0.34999999999999998 0.019444444444444445 0.29999999999999999 0.10000000000000001" name="MainPanel">
+        <Widget type="ItemBox" skin="BackgroundPanel" position="15 10 90 85" name="ObjectPreviewBG"/>
+        <Widget type="TextBox" skin="TextBox" position="145 15 410 25" align="Left VCenter" name="ObjectTitle">
+            <Property key="FontName" value="SM_ItemTitle"/>
+        </Widget>
+        <Widget type="TextBox" skin="TextBox" position="145 45 410 45" align="Left Top" name="ObjectSubtitle"/>
+        <Widget type="ImageBox" skin="ImageBox" position="15 10 90 85" align="Center" name="ObjectPreview"/>
+        <Widget type="ImageBox" skin="WhiteSkin" position="110 10 10 85" name="ObjectColor"/>
+    </Widget>
+    <CodeGeneratorSettings/>
+</MyGUI>
