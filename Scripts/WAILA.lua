@@ -41,13 +41,13 @@ WAILA.interactableType = {
     TOTEBOT_HEAD = 7,
     RADIO = 8,
     SENSOR = 9,
-    THRUSTER = 10
+    THRUSTER = 10,
+    LIGHT = 11
 }
 
 
 function WAILA.client_onCreate(self)
     self:client_initializeGUI()
-    self.gui:open()
 end
 
 function WAILA.server_onCreate(self)
@@ -66,15 +66,17 @@ function WAILA.client_onFixedUpdate(self, deltaTime)
 end
 
 function WAILA.client_initializeGUI(self)
-    self:client_setTitleLabel("Initializing SMWAILA")
-    self:client_setPropertiesLabel("Please wait...")
+    self:client_setTitleLabel("Welcome to SM: WAILA")
+    self:client_setPropertiesLabel(
+        "You'll see information about the object you're looking here.\nFor some objects, special information is available.")
     self:client_setPreview(sm.uuid.new("fdb8b8be-96e7-4de0-85c7-d2f42e4f33ce"))
     if (not self.gui:isActive()) then
         self.gui:open()
     end
 end
 
---- @param raycastResult RaycastResult
+--- Displays a WAILA panel for the <code>RaycastResult</code> supplied.
+--- @param raycastResult RaycastResult The raycast result to display a WAILA panel for.
 function WAILA.client_displayPanel(self, raycastResult)
     if (not raycastResult.valid) then
         self:client_closePanel()
@@ -242,7 +244,7 @@ function WAILA.client_displayPanel(self, raycastResult)
 
             self:client_setTitleLabel(sm.shape.getShapeTitle(asInter.shape.uuid))
             self:client_setColor(asInter.shape.color)
-        elseif (type == self.interactableType.RADIO) then
+        elseif (type == self.interactableType.RADIO or type == self.interactableType.LIGHT) then
             local state = ""
             if (asInter.active) then
                 state = "#4cbb17[ON]"
@@ -349,22 +351,36 @@ function WAILA.client_displayPanel(self, raycastResult)
     self.gui:open()
 end
 
+--- Sets the color box's color for SMWAILA's panel
+--- @param self WAILA
+--- @param color Color The color to set
 function WAILA.client_setColor(self, color)
     self.gui:setColor("ObjectColor", color)
 end
 
+--- Sets the preview image to the icon of the supplied shapeUUID
+---@param self WAILA
+---@param shapeUUID Uuid The UUID for the shape whose icon to set the preview to
 function WAILA.client_setPreview(self, shapeUUID)
     self.gui:setIconImage("ObjectPreview", shapeUUID)
 end
 
+--- Sets the title label to <code>title</code>
+---@param self WAILA
+---@param title string The title to set
 function WAILA.client_setTitleLabel(self, title)
     self.gui:setText("ObjectTitle", title)
 end
 
+--- Sets the properties label to <code>properties</code>
+--- @param self WAILA
+--- @param properties string The text to show in the properties label.
 function WAILA.client_setPropertiesLabel(self, properties)
     self.gui:setText("ObjectSubtitle", properties)
 end
 
+--- Hides the SMWAILA panel
+--- @param self WAILA
 function WAILA.client_closePanel(self)
     self.gui:close()
     self:client_setTitleLabel("...")
@@ -372,7 +388,10 @@ function WAILA.client_closePanel(self)
     self:client_setPreview(sm.uuid.new("fdb8b8be-96e7-4de0-85c7-d2f42e4f33ce"))
 end
 
+--- Returns a string representing the current mode of operation for the supplied <code>Interactable</code>
+--- @param self WAILA
 --- @param interactable Interactable
+--- @return string gateType The operation mode for the specified logic gate
 function WAILA.client_getLogicGateTypeByUVIndex(self, interactable)
     if (interactable:getUvFrameIndex() == 0 or interactable:getUvFrameIndex() == 6) then
         return "AND"
@@ -389,6 +408,8 @@ function WAILA.client_getLogicGateTypeByUVIndex(self, interactable)
     end
 end
 
+--- Gets the type of object hit from the RaycastResult.<br>
+--- All possible values are in the <code>WAILA.inspectable</code> table.
 --- @param raycastResult RaycastResult
 --- @return number type The type of object hit by the ray.
 function WAILA.client_getHitType(self, raycastResult)
@@ -418,6 +439,7 @@ function WAILA.client_getHitType(self, raycastResult)
     if (raycastResult:getBody() ~= nil) then return self.inspectable.BODY end
 end
 
+--- Gets the type of interactable the supplied <code>Interactable</code> represents as a <code>WAILA.interactableType</code>.
 --- @param interactable Interactable
 --- @return number type The type of interactable this Interactable represents
 function WAILA.client_getInteractableType(self, interactable)
@@ -449,7 +471,10 @@ function WAILA.client_getInteractableType(self, interactable)
         return self
             .interactableType.THRUSTER
     end
-    print(interactable:getType())
+    if (interactable:getType() == "spotLight" or interactable:getType() == "pointLight") then
+        return self.interactableType.LIGHT
+    end
+    --print(interactable:getType())
 end
 
 function WAILA.server_getPublicData(self, interactable)
