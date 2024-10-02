@@ -32,17 +32,29 @@ function table.hasValue(table, value)
     return containsValue(table, value)
 end
 
---- Returns `true` if the provided value is in `table`. Provides false otherwise.
---- @param table table The table to inspect
+function table.hasKey(table, key)
+    return containsKey(table, key)
+end
+
+--- Returns `true` if the provided value is in `table`. Returns false otherwise.
+--- @param _table table The table to inspect
 --- @param value any The value to check for.
 ---@return boolean found Whether the value is within `table`
-function containsValue(table, value)
-    for k, v in pairs(table) do
+function containsValue(_table, value)
+    for k, v in pairs(_table) do
         if (v == value) then
             return true
         end
     end
     return false
+end
+
+--- Returns `true` if the provided key is in `table`. Returns false otherwise.
+--- @param _table table The table to inspect
+--- @param value any The key to check for.
+---@return boolean found Whether the key is within `table`
+function containsKey(_table, key)
+    return _table[key] ~= nil
 end
 
 -- Gets the Vector3 from the coords formatted with `formatVector(vec3)`

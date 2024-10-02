@@ -9,6 +9,7 @@ WAILA.gui = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_top.layo
     isHud = true, isInteractive = false, needsCursor = false
 })
 
+
 -- A table of all inspectable object types
 WAILA.inspectable = {
     INTERACTABLE = 1,
@@ -20,6 +21,7 @@ WAILA.inspectable = {
     BEARING = 7,
     HARVESTABLE = 8,
     CONSUMABLE = 9,
+    UNKNOWN = 404,
     [1] = "INTERACTABLE",
     [2] = "SHAPE",
     [3] = "BODY",
@@ -28,7 +30,8 @@ WAILA.inspectable = {
     [6] = "PISTON",
     [7] = "BEARING",
     [8] = "HARVESTABLE",
-    [9] = "CONSUMABLE"
+    [9] = "CONSUMABLE",
+    [404] = "UNKNOWN"
 }
 
 WAILA.interactableType = {
@@ -45,6 +48,24 @@ WAILA.interactableType = {
     LIGHT = 11
 }
 
+WAILA.vanillaCharacters = {
+    [sm.uuid.new("264a563a-e304-430f-a462-9963c77624e9")] = "Woc",
+
+    ["48c03f69-3ec8-454c-8d1a-fa09083363b1"] = "Glowbug",
+    ["04761b4a-a83e-4736-b565-120bc776edb2"] = "Tapebot (variant 1)",
+    ["9dbbd2fb-7726-4e8f-8eb4-0dab228a561d"] = "Tapebot (variant 2)",
+    ["fcb2e8ce-ca94-45e4-a54b-b5acc156170b"] = "Tapebot (variant 3)",
+    ["68d3b2f3-ed4b-4967-9d22-8ee6f555df63"] = "Tapebot (variant 4)",
+    ["c3d31c47-0c9b-4b07-9bd4-8f022dc4333e"] = "Explosive Tapebot",
+    ["8984bdbf-521e-4eed-b3c4-2b5e287eb879"] = "Totebot",
+    ["c8bfb8f3-7efc-49ac-875a-eb85ac0614db"] = "Haybot",
+    ["9f4fde94-312f-4417-b13b-84029c5d6b52"] = "Farmbot",
+    ["b6cafd3e-970b-4974-bb9f-ba7184b02797"] = "Builderbot"
+}
+
+WAILA.isShown = false
+WAILA.lastObjectId = nil
+WAILA.lastObjectUUID = nil
 
 function WAILA.client_onCreate(self)
     self:client_initializeGUI()
@@ -78,6 +99,7 @@ end
 --- Displays a WAILA panel for the <code>RaycastResult</code> supplied.
 --- @param raycastResult RaycastResult The raycast result to display a WAILA panel for.
 function WAILA.client_displayPanel(self, raycastResult)
+    local startTime = os.clock()
     if (not raycastResult.valid) then
         self:client_closePanel()
         return
@@ -86,12 +108,22 @@ function WAILA.client_displayPanel(self, raycastResult)
         self:client_closePanel()
         return
     end
+
+    if (raycastResult:getShape() ~= nil) then
+        if (raycastResult:getShape().id == self.lastObjectId and raycastResult:getShape().uuid == self.lastObjectUUID) then
+            return
+        end
+        self.lastObjectId = raycastResult:getShape().id
+        self.lastObjectUUID = raycastResult:getShape().uuid
+    end
+
     if (self.gui:isActive()) then
         self.gui:close()
     end
 
     self:client_setTitleLabel("")
     self:client_setPropertiesLabel("")
+
 
     local hitType = self:client_getHitType(raycastResult)
 
@@ -110,20 +142,39 @@ function WAILA.client_displayPanel(self, raycastResult)
     --- @type Body
     local asBody = raycastResult:getBody()
 
-    if (asBody ~= nil) then
-        if (sizeof(asBody:getShapes()) == 1) then
-            asShape = asBody:getShapes()[1]
+    if (hitType == self.inspectable.BODY) then
+        if (asBody ~= nil) then
+            if (sizeof(asBody:getShapes()) == 1) then
+                asShape = asBody:getShapes()[1]
+            end
         end
     end
 
     if (hitType == self.inspectable.SHAPE) then
         self:client_setColor(asShape.color)
         if (asShape.isBlock) then
+            local _body = asBody
+            local _shapes = asBody:getShapes()
+
             local blocks = 0
             local mass = 0
-            local filterShape = asShape.uuid
-            local filterColor = asShape.color
-            for _, shape in ipairs(raycastResult:getBody():getShapes()) do
+            local filterShape = nil
+            local filterColor = nil
+
+            local shapes = {}
+
+
+            if (sizeof(_shapes) > 5) then
+                shapes = { [1] = asShape }
+                filterShape = shapes[1].uuid
+                filterColor = shapes[1].color
+            else
+                filterShape = asShape.uuid
+                filterColor = asShape.color
+                shapes = _shapes
+            end
+
+            for _, shape in ipairs(shapes) do
                 if (shape.uuid == filterShape and shape.color == filterColor) then
                     blocks = blocks + blocksInShape(shape)
                     mass = mass + shape.mass
@@ -131,6 +182,7 @@ function WAILA.client_displayPanel(self, raycastResult)
             end
 
             self:client_setTitleLabel(sm.shape.getShapeTitle(asShape.uuid) .. " #FCC200x" .. blocks)
+
             self:client_setPropertiesLabel("Mass: #FCC200" .. mass .. " kg")
             self:client_setPreview(asShape.uuid)
         else
@@ -319,7 +371,11 @@ function WAILA.client_displayPanel(self, raycastResult)
         if (asChar:getPlayer() ~= nil) then
             self:client_setTitleLabel(asChar:getPlayer().name)
         else
-            self:client_setTitleLabel("Character #" .. asChar:getId())
+            if (table.hasKey(self.vanillaCharacters, tostring(asChar:getCharacterType()))) then
+                self:client_setTitleLabel(self.vanillaCharacters[tostring(asChar:getCharacterType())])
+            else
+                self:client_setTitleLabel("Character ##" .. asChar:getId())
+            end
 
             local activeAnimations = ""
             for _, anim in ipairs(asChar:getActiveAnimations()) do
@@ -337,18 +393,13 @@ function WAILA.client_displayPanel(self, raycastResult)
                 "\n#ffffffAnimation: " .. activeAnimations)
         end
         self:client_setPreview(sm.uuid.new("068a89ca-504e-4782-9ede-48f710aeea73"))
-    end
-
-
-    if (asShape ~= nil) then
-        -- If we hit a Joint (piston/bearing)
-    elseif (asJoint ~= nil) then
-    elseif (asLift ~= nil) then
-
-    elseif (asChar ~= nil) then
+    elseif hitType == self.inspectable.UNKNOWN then
 
     end
     self.gui:open()
+    self.isShown = true
+    print("WAILA panel update took " ..
+        math.ceil((os.clock() - startTime) * 1000) .. "ms")
 end
 
 --- Sets the color box's color for SMWAILA's panel
@@ -386,6 +437,7 @@ function WAILA.client_closePanel(self)
     self:client_setTitleLabel("...")
     self:client_setPropertiesLabel("...")
     self:client_setPreview(sm.uuid.new("fdb8b8be-96e7-4de0-85c7-d2f42e4f33ce"))
+    self.isShown = false
 end
 
 --- Returns a string representing the current mode of operation for the supplied <code>Interactable</code>
@@ -474,7 +526,7 @@ function WAILA.client_getInteractableType(self, interactable)
     if (interactable:getType() == "spotLight" or interactable:getType() == "pointLight") then
         return self.interactableType.LIGHT
     end
-    --print(interactable:getType())
+    return self.interactableType.UNKNOWN
 end
 
 function WAILA.server_getPublicData(self, interactable)
