@@ -1,13 +1,41 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <MyGUI type="Layout" version="3.2.0">
-    <Widget type="Widget" skin="SMButton" position_real="0.34999999999999998 0.019444444444444445 0.29999999999999999 0.10000000000000001" name="MainPanel">
-        <Widget type="ItemBox" skin="BackgroundPanel" position="15 10 90 85" name="ObjectPreviewBG"/>
-        <Widget type="TextBox" skin="TextBox" position="145 15 410 25" align="Left VCenter" name="ObjectTitle">
-            <Property key="FontName" value="SM_ItemTitle"/>
+    <Widget type="Widget" skin="NonBlurryBackgroundLightSquared"
+        position_real="0.33072916666666669 0.019444444444444445 0.33854166666666669 0.11944444444444445"
+        name="MainPanel">
+        <Property key="Colour" value="0.450292 0.315995 0.315995" />
+        <Widget type="ItemBox" skin="InteractionBindingBackground" position="10 10 110 110"
+            name="ObjectPreviewBG">
+            <Property key="Colour" value="0.163743 0.163743 0.163743" />
         </Widget>
-        <Widget type="TextBox" skin="TextBox" position="145 45 410 45" align="Left Top" name="ObjectSubtitle"/>
-        <Widget type="ImageBox" skin="ImageBox" position="15 10 90 85" align="Center" name="ObjectPreview"/>
-        <Widget type="ImageBox" skin="WhiteSkin" position="110 10 10 85" name="ObjectColor"/>
+        <Widget type="TextBox" skin="TextBox" position="140 15 340 35" align="Left VCenter"
+            name="ObjectTitle">
+            <Property key="FontName" value="SM_ItemTitle" />
+            <Property key="TextAlign" value="Left VCenter" />
+            <Property key="Caption" value="Item Title" />
+        </Widget>
+        <Widget type="TextBox" skin="TextBox" position="140 50 480 65" align="Left Top"
+            name="ObjectSubtitle">
+            <Property key="TextAlign" value="Left Top" />
+            <Property key="Caption" value="Item properties, description etc." />
+        </Widget>
+        <Widget type="ImageBox" skin="ImageBox" position="15 15 100 100" align="Center"
+            name="ObjectPreviewAlternative" />
+        <Widget type="ImageBox" skin="ImageBox" position="15 15 100 100" align="Center"
+            name="ObjectPreview" />
+        <Widget type="ImageBox" skin="InteractionBindingBackground" position="95 95 20 20"
+            name="ObjectColor">
+            <Property key="Colour" value="1 1 1" />
+        </Widget>
     </Widget>
-    <CodeGeneratorSettings/>
+    <Widget type="Widget" skin="InteractionBindingBackground" position="1130 40 135 25"
+        name="TypeLabelBG">
+        <Widget type="TextBox" skin="TextBox" position="-5 -5 145 35" name="TypeLabel">
+            <Property key="FontName" value="SM_ButtonSmall" />
+            <Property key="TextAlign" value="Center" />
+            <Property key="TextColour" value="0 0 0" />
+            <Property key="Caption" value="ITEM TYPE" />
+        </Widget>
+    </Widget>
+    <CodeGeneratorSettings />
 </MyGUI>
