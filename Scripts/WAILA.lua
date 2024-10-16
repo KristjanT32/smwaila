@@ -235,6 +235,8 @@ function WAILA.client_displayPanel(self, raycastResult)
     self:client_setTypeLabel(hitType)
     if (asShape ~= nil) then
         self:client_setShapeStats(asShape)
+    elseif (asJoint ~= nil) then
+        self:client_setShapeStatsByUUID(asJoint.uuid)
     else
         self:client_hideShapeStats()
     end
@@ -251,7 +253,7 @@ function WAILA.client_displayPanel(self, raycastResult)
             if (sm.localPlayer.getPlayer():getCharacter():getWorld():isIndoor()) then
                 _shapes = { asShape }
             else
-                _body:getShapes()
+                _shapes = _body:getShapes()
             end
 
             local blocks = 0
@@ -588,6 +590,26 @@ function WAILA.client_setShapeStats(self, shape)
     self.gui:setText("ObjectStats", str)
 end
 
+function WAILA.client_setShapeStatsByUUID(self, uuid)
+    self.gui:setVisible("ObjectStatsPanel", true)
+    local ratings = self:client_getShapeRatings(uuid)
+    if (ratings == nil) then
+        self.gui:setVisible("ObjectStatsPanel", false)
+        return
+    end
+
+    local str = "#ffffffBuoyancy: #FCC200" .. string.format("%.1f", ratings.buoyancy or 0)
+        .. "   "
+        .. "#ffffffDurability: #FCC200" .. string.format("%.1f", ratings.durability or 0)
+        .. "   "
+        .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction or 0)
+        .. "   "
+        .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
+
+
+    self.gui:setText("ObjectStats", str)
+end
+
 function WAILA.client_hideShapeStats(self, shape)
     self.gui:setVisible("ObjectStatsPanel", false)
 end
@@ -706,11 +728,11 @@ function WAILA.client_getInteractableType(self, interactable)
     return self.interactableType.UNKNOWN
 end
 
-function WAILA.client_getShapeRatings(self, shape)
+function WAILA.client_getShapeRatings(self, uuid)
     if (self.cachedRatings == {}) then
         self:client_cacheShapeRatings()
     end
-    return self.cachedRatings[tostring(shape.uuid)]
+    return self.cachedRatings[tostring(uuid)]
 end
 
 --- Returns a table representing the ratings of the supplied shape.
