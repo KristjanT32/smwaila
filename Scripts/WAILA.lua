@@ -138,6 +138,7 @@ WAILA.vanillaHarvestables = {
 WAILA.isShown = false
 WAILA.lastObjectId = nil
 WAILA.lastObjectUUID = nil
+WAILA.cachedRatings = {}
 
 function WAILA.client_onCreate(self)
     self:client_initializeGUI()
@@ -145,6 +146,7 @@ end
 
 function WAILA.server_onCreate(self)
     print("[SM: WAILA] Initializing...")
+    self:client_cacheShapeRatings()
 end
 
 function WAILA.client_onFixedUpdate(self, deltaTime)
@@ -231,6 +233,11 @@ function WAILA.client_displayPanel(self, raycastResult)
     end
 
     self:client_setTypeLabel(hitType)
+    if (asShape ~= nil) then
+        self:client_setShapeStats(asShape)
+    else
+        self:client_hideShapeStats()
+    end
 
     if (hitType == self.inspectable.SHAPE) then
         self.lastObjectId = raycastResult:getShape().id
@@ -239,7 +246,13 @@ function WAILA.client_displayPanel(self, raycastResult)
         self:client_setColor(asShape.color)
         if (asShape.isBlock) then
             local _body = asBody
-            local _shapes = asBody:getShapes()
+            local _shapes = {}
+
+            if (sm.localPlayer.getPlayer():getCharacter():getWorld():isIndoor()) then
+                _shapes = { asShape }
+            else
+                _body:getShapes()
+            end
 
             local blocks = 0
             local mass = 0
@@ -247,8 +260,6 @@ function WAILA.client_displayPanel(self, raycastResult)
             local filterColor = nil
 
             local shapes = {}
-
-
             if (sizeof(_shapes) > 5) then
                 shapes = { [1] = asShape }
                 filterShape = shapes[1].uuid
@@ -513,6 +524,7 @@ end
 --- @param color Color The color to set
 function WAILA.client_setColor(self, color)
     self.gui:setColor("ObjectColor", color)
+    self.gui:setText("ObjectColorCode", formatColorHex(color))
 end
 
 --- Sets the preview image to the icon of the supplied shapeUUID
@@ -553,6 +565,31 @@ end
 --- @param properties string The text to show in the properties label.
 function WAILA.client_setPropertiesLabel(self, properties)
     self.gui:setText("ObjectSubtitle", properties)
+end
+
+--- Updates the stats label to reflect the currently targeted shape's properties.
+---@param self WAILA
+---@param shape Shape the shape whose stats to display
+function WAILA.client_setShapeStats(self, shape)
+    self.gui:setVisible("ObjectStatsPanel", true)
+    local ratings = self:client_getShapeRatings(shape)
+
+    local str = "#ffffffBuoyancy: #FCC200" .. string.format("%.1f", shape:getBuoyancy())
+        .. "   "
+        .. "#ffffffDurability: #FCC200" .. string.format("%.1f", sm.item.getQualityLevel(shape.uuid))
+
+    if (ratings ~= nil) then
+        str = str .. "   "
+            .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction or 0)
+            .. "   "
+            .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
+    end
+
+    self.gui:setText("ObjectStats", str)
+end
+
+function WAILA.client_hideShapeStats(self, shape)
+    self.gui:setVisible("ObjectStatsPanel", false)
 end
 
 function WAILA.client_setTypeLabel(self, type)
@@ -669,11 +706,33 @@ function WAILA.client_getInteractableType(self, interactable)
     return self.interactableType.UNKNOWN
 end
 
-function WAILA.server_getPublicData(self, interactable)
-    print(interactable.publicData)
+function WAILA.client_getShapeRatings(self, shape)
+    if (self.cachedRatings == {}) then
+        self:client_cacheShapeRatings()
+    end
+    return self.cachedRatings[tostring(shape.uuid)]
 end
 
---- @param character Character
-function WAILA.server_getUnit(self, character)
-    print(character:getUnit())
+--- Returns a table representing the ratings of the supplied shape.
+---@return table|nil ratings The ratings table, or nil if none found/shape invalid.
+function WAILA.client_cacheShapeRatings(self)
+    self.cachedRatings = {}
+    local start = os.clock()
+    print("[SM: WAILA] Caching shape ratings...")
+
+    local shapesets = sm.json.open("$GAME_DATA/Objects/Database/shapesets.json")
+    for _, shapeset in pairs(shapesets.shapeSetList) do
+        local opened_shapeset = sm.json.open(shapeset)
+        if (opened_shapeset["blockList"] ~= nil) then
+            for _, value in pairs(opened_shapeset["blockList"]) do
+                self.cachedRatings[tostring(value.uuid)] = value.ratings
+            end
+        end
+        if (opened_shapeset["partList"] ~= nil) then
+            for _, value in pairs(opened_shapeset["partList"]) do
+                self.cachedRatings[tostring(value.uuid)] = value.ratings
+            end
+        end
+    end
+    print("[SM: WAILA] Caching completed in " .. math.floor((os.clock() - start) * 1000) .. "ms")
 end

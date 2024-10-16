@@ -70,6 +70,14 @@ function vec3FromFormattedCoords(formatted_coords)
     return sm.vec3.new(tonumber(coords[1], 10), tonumber(coords[2], 10), tonumber(coords[3], 10))
 end
 
+--- Returns a formatted string representing an escaped color sequence for the provided color.
+---@param color Color The color to format a hex string for.
+function formatColorHex(color)
+    local str = color:getHexStr()
+    str = str:sub(0, str:len() - 2)
+    return "##" .. str:upper()
+end
+
 --- @param shape Shape
 function blocksInShape(shape)
     return (shape:getBoundingBox().x / 0.25) * (shape:getBoundingBox().y / 0.25) * (shape:getBoundingBox().z / 0.25)
