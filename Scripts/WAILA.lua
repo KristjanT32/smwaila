@@ -289,9 +289,6 @@ function WAILA.client_displayPanel(self, raycastResult)
             self:client_setPreview(asShape.uuid)
         end
     elseif (hitType == self.inspectable.INTERACTABLE) then
-        self.lastObjectId = raycastResult:getShape().id
-        self.lastObjectUUID = raycastResult:getShape().uuid
-
         local asInter = asShape:getInteractable()
         local type = self:client_getInteractableType(asInter)
         self:client_setPreview(asInter:getShape().uuid)
