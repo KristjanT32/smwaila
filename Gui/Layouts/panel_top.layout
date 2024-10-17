@@ -10,7 +10,7 @@
             <Property key="TextAlign" value="Left VCenter"/>
             <Property key="Caption" value="Item Title"/>
         </Widget>
-        <Widget type="TextBox" skin="TextBox" position="140 50 395 60" align="Left Top" name="ObjectSubtitle">
+        <Widget type="TextBox" skin="TextBox" position="140 50 340 60" align="Left Top" name="ObjectSubtitle">
             <Property key="TextAlign" value="Left Top"/>
             <Property key="Caption" value="Item properties, description etc."/>
         </Widget>
@@ -24,6 +24,23 @@
                 <Property key="FontHeight" value="18"/>
                 <Property key="TextShadow" value="true"/>
                 <Property key="TextShadowColour" value="0 0 0"/>
+            </Widget>
+        </Widget>
+        <Widget type="ImageBox" skin="InteractionBindingBackground" position="495 50 135 25" name="ObjectColorLong">
+            <Property key="Colour" value="1 1 1"/>
+            <Widget type="TextBox" skin="TextBox" position="0 0 135 25" name="ObjectColorCode">
+                <Property key="FontName" value="SM_ItemTitle"/>
+                <Property key="TextAlign" value="Center"/>
+                <Property key="FontHeight" value="18"/>
+                <Property key="TextShadow" value="true"/>
+                <Property key="TextShadowColour" value="0 0 0"/>
+            </Widget>
+        </Widget>
+        <Widget type="ImageBox" skin="InteractionBindingBackground" position="495 50 50 25" name="ObjectState">
+            <Widget type="TextBox" skin="TextBox" position="0 0 50 25" name="ObjectStateLabel">
+                <Property key="FontName" value="SM_ItemTitle"/>
+                <Property key="TextAlign" value="Center"/>
+                <Property key="FontHeight" value="18"/>
             </Widget>
         </Widget>
     </Widget>

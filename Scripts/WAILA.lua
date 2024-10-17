@@ -10,6 +10,11 @@ WAILA.gui = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_top.layo
 })
 
 
+-- TODO: Implement suspension
+
+
+
+
 -- A table of all inspectable object types
 WAILA.inspectable = {
     INTERACTABLE = 1,
@@ -135,9 +140,21 @@ WAILA.vanillaHarvestables = {
     ["6757b211-f50c-42c5-bd7c-648dcbe3ed52"] = { name = "Glowstick Remains", iconUUID = "3a3280e4-03b6-4a4d-9e02-e348478213c9" }
 }
 
+--- @type boolean
 WAILA.isShown = false
-WAILA.lastObjectId = nil
-WAILA.lastObjectUUID = nil
+
+WAILA.current = {
+    --- @type Shape|Interactable|Harvestable|Character|Joint
+    target = nil,
+
+    --- @type string
+    type = nil,
+
+    --- @type integer
+    lastUpdate = 0
+}
+
+--- @type table<string|table>
 WAILA.cachedRatings = {}
 
 function WAILA.client_onCreate(self)
@@ -156,8 +173,11 @@ function WAILA.client_onFixedUpdate(self, deltaTime)
     if (successful) then
         self:client_displayPanel(result)
     else
-        self:client_closePanel()
+        if (self.isShown) then
+            self:client_closePanel()
+        end
     end
+    self.current.lastUpdate = self.current.lastUpdate + 1
 end
 
 function WAILA.client_initializeGUI(self)
@@ -173,6 +193,11 @@ end
 --- Displays a WAILA panel for the <code>RaycastResult</code> supplied.
 --- @param raycastResult RaycastResult The raycast result to display a WAILA panel for.
 function WAILA.client_displayPanel(self, raycastResult)
+    if (self.current.lastUpdate <= 1 and self.isShown) then
+        --print("[SM: WAILA] Last refresh: " .. self.current.lastUpdate .. "ms")
+        return
+    end
+    self.current.lastUpdate = 0
     local startTime = os.clock()
     if (not raycastResult.valid) then
         self:client_closePanel()
@@ -183,28 +208,11 @@ function WAILA.client_displayPanel(self, raycastResult)
         return
     end
 
-    if (raycastResult:getShape()) then
-        local currentShapeId = raycastResult:getShape().id
-        local currentShapeUuid = raycastResult:getShape().uuid
-        if (currentShapeId == self.lastObjectId and currentShapeUuid == self.lastObjectUUID) then
-            return
-        end
-    end
-
-    if (raycastResult:getHarvestable()) then
-        local currentHarvestableId = raycastResult:getHarvestable().id
-        local currentHarvestableUuid = raycastResult:getHarvestable().uuid
-        if (currentHarvestableId == self.lastObjectId and currentHarvestableUuid == self.lastObjectUUID) then
-            return
-        end
-    end
-
     if (self.gui:isActive()) then
         self.gui:close()
     end
 
-    self:client_setTitleLabel("")
-    self:client_setPropertiesLabel("")
+    self:client_resetPanel()
 
 
     local hitType = self:client_getHitType(raycastResult)
@@ -224,6 +232,8 @@ function WAILA.client_displayPanel(self, raycastResult)
     --- @type Body
     local asBody = raycastResult:getBody()
 
+    self.current.type = hitType
+
     if (hitType == self.inspectable.BODY) then
         if (asBody ~= nil) then
             if (sizeof(asBody:getShapes()) == 1) then
@@ -242,8 +252,7 @@ function WAILA.client_displayPanel(self, raycastResult)
     end
 
     if (hitType == self.inspectable.SHAPE) then
-        self.lastObjectId = raycastResult:getShape().id
-        self.lastObjectUUID = raycastResult:getShape().uuid
+        self.current.target = asShape
 
         self:client_setColor(asShape.color)
         if (asShape.isBlock) then
@@ -281,7 +290,7 @@ function WAILA.client_displayPanel(self, raycastResult)
 
             self:client_setTitleLabel(sm.shape.getShapeTitle(asShape.uuid) .. " #FCC200x" .. blocks)
             self:client_setPropertiesLabel("Mass: #FCC200" ..
-                mass ..
+                string.format("%.1f", mass) ..
                 " kg\n#FFFFFFBuoyancy: #FCC200" .. string.format("%.1f", asShape:getBuoyancy()))
             self:client_setPreview(asShape.uuid)
         else
@@ -292,6 +301,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         local asInter = asShape:getInteractable()
         local type = self:client_getInteractableType(asInter)
         self:client_setPreview(asInter:getShape().uuid)
+        self.current.target = asInter
 
         if (type == self.interactableType.LOGIC_GATE) then
             local mode = self:client_getLogicGateTypeByUVIndex(asInter)
@@ -301,25 +311,16 @@ function WAILA.client_displayPanel(self, raycastResult)
                 " #ffffffoutgoing connections, #D4002E" ..
                 sizeof(asInter:getParents(1)) .. " #ffffffincoming connections")
 
-            local state = ""
-            if (asInter.active) then
-                state = "#4cbb17[ON]"
-            else
-                state = "#D43C00[OFF]"
-            end
 
+            self:client_setInteractableState(asInter.active)
             self.gui:setText("ObjectTitle",
-                sm.shape.getShapeTitle(asInter:getShape().uuid) .. " #ffffff(" .. mode .. "#ffffff) - " .. state)
+                sm.shape.getShapeTitle(asInter:getShape().uuid) .. " #ffffff(" .. mode .. "#ffffff)")
+            self:client_setColor(asInter.shape.color)
         elseif (type == self.interactableType.SWITCH) then
-            local state = ""
-            if (asInter.active) then
-                state = "#4cbb17[ON]"
-            else
-                state = "#D43C00[OFF]"
-            end
+            self:client_setInteractableState(asInter.active)
 
             self.gui:setText("ObjectTitle",
-                sm.shape.getShapeTitle(asInter:getShape().uuid) .. " " .. state)
+                sm.shape.getShapeTitle(asInter:getShape().uuid))
 
             local controlsLabel = ""
             local seatConnectionLabel = ""
@@ -341,8 +342,10 @@ function WAILA.client_displayPanel(self, raycastResult)
                     self:client_setPropertiesLabel(controlsLabel .. "\n" .. seatConnectionLabel)
                 end
             end
+            self:client_setColor(asInter.shape.color)
         elseif (type == self.interactableType.TIMER) then
             self:client_setTitleLabel(sm.shape.getShapeTitle(asInter:getShape().uuid))
+            self:client_setInteractableState(asInter.active)
             if (asInter:getUvFrameIndex() > 0) then
                 if (asInter.active) then
                     self:client_setPropertiesLabel("Idle (done)")
@@ -358,7 +361,6 @@ function WAILA.client_displayPanel(self, raycastResult)
             self:client_setTitleLabel(sm.shape.getShapeTitle(asInter:getShape().uuid))
             local controlledByLabel = ""
             local controlsLabel = ""
-
             if (asInter:getSingleParent() ~= nil) then
                 controlledByLabel = "#ffffffControlled by #FCC200" ..
                     sm.shape.getShapeTitle(asInter:getSingleParent().shape.uuid)
@@ -396,15 +398,9 @@ function WAILA.client_displayPanel(self, raycastResult)
             self:client_setTitleLabel(sm.shape.getShapeTitle(asInter.shape.uuid))
             self:client_setColor(asInter.shape.color)
         elseif (type == self.interactableType.RADIO or type == self.interactableType.LIGHT) then
-            local state = ""
-            if (asInter.active) then
-                state = "#4cbb17[ON]"
-            else
-                state = "#D43C00[OFF]"
-            end
+            self:client_setInteractableState(asInter.active)
 
-            self:client_setTitleLabel(sm.shape.getShapeTitle(asInter.shape.uuid) .. " " .. state)
-
+            self:client_setTitleLabel(sm.shape.getShapeTitle(asInter.shape.uuid))
             self:client_setColor(asInter.shape.color)
             if (asInter:getSingleParent() ~= nil) then
                 self:client_setPropertiesLabel("Controlled by #FCC200" ..
@@ -413,15 +409,10 @@ function WAILA.client_displayPanel(self, raycastResult)
                 self:client_setPropertiesLabel("#D4002ENo connections")
             end
         elseif (type == self.interactableType.SENSOR) then
-            local state = ""
-            if (asInter.active) then
-                state = "#4cbb17[ON]"
-            else
-                state = "#D43C00[OFF]"
-            end
+            self:client_setInteractableState(asInter.active)
 
             self.gui:setText("ObjectTitle",
-                sm.shape.getShapeTitle(asInter:getShape().uuid) .. " " .. state)
+                sm.shape.getShapeTitle(asInter:getShape().uuid))
             self:client_setColor(asInter.shape.color)
             if (sizeof(asInter:getChildren(1)) > 0) then
                 self:client_setPropertiesLabel("#ffffffControls #FCC200" ..
@@ -433,17 +424,19 @@ function WAILA.client_displayPanel(self, raycastResult)
             self:client_setTitleLabel(sm.shape.getShapeTitle(asInter.shape.uuid))
             self:client_setColor(asInter.shape.color)
         end
+        self:client_setColor(asInter.shape.color)
     elseif (hitType == self.inspectable.CONSUMABLE) then
-        self.lastObjectId = raycastResult:getShape().id
-        self.lastObjectUUID = raycastResult:getShape().uuid
+        self.current.target = asShape
 
         local shape = raycastResult:getShape()
         self:client_setTitleLabel(sm.shape.getShapeTitle(shape.uuid))
         self:client_setPropertiesLabel(sm.shape.getShapeDescription(shape.uuid))
         self:client_setPreview(shape.uuid)
+        self:client_setColor(asShape.color)
     elseif (hitType == self.inspectable.PISTON) then
         self:client_setTitleLabel(sm.shape.getShapeTitle(asJoint:getShapeUuid()))
         self:client_setPreview(asJoint:getShapeUuid())
+        self.current.target = asJoint
 
         if (asJoint:getLength() < 1.5) then
             self:client_setPropertiesLabel("Not extended")
@@ -451,7 +444,9 @@ function WAILA.client_displayPanel(self, raycastResult)
             self:client_setPropertiesLabel(
                 "Extended by: #FCC200" .. math.floor(asJoint:getLength()) .. " blocks")
         end
+        self:client_setColor(asJoint:getShapeA().color)
     elseif (hitType == self.inspectable.BEARING) then
+        self.current.target = asJoint
         self:client_setTitleLabel(sm.shape.getShapeTitle(asJoint:getShapeUuid()))
         self:client_setPreview(asJoint:getShapeUuid())
         self:client_setPropertiesLabel("Speed: #FCC200" ..
@@ -459,7 +454,9 @@ function WAILA.client_displayPanel(self, raycastResult)
             " #ffffffrad/s (#FCC200" ..
             math.ceil(math.deg(asJoint:getAngularVelocity())) ..
             "#ffffff °/s)" .. "\n#ffffffAngle: #FCC200" .. math.floor(math.deg(asJoint:getAngle())) .. " #ffffff°")
+        self:client_setColor(asJoint:getShapeA().color)
     elseif (hitType == self.inspectable.LIFT) then
+        self.current.target = asLift
         if (sm.localPlayer.getOwnedLift() == asLift) then
             self:client_setTitleLabel("Your Lift")
         else
@@ -470,6 +467,7 @@ function WAILA.client_displayPanel(self, raycastResult)
             asLift.id .. "\n#ffffffHeight: #FCC200" .. asLift.level .. " blocks")
         self:client_setPreview(sm.uuid.new("5cc12f03-275e-4c8e-b013-79fc0f913e1b"))
     elseif (hitType == self.inspectable.CHARACTER) then
+        self.current.target = asChar
         if (asChar:getPlayer() ~= nil) then
             self:client_setTitleLabel(asChar:getPlayer().name)
         else
@@ -496,15 +494,13 @@ function WAILA.client_displayPanel(self, raycastResult)
         end
         --self:client_setPreview(sm.uuid.new("068a89ca-504e-4782-9ede-48f710aeea73"))
     elseif hitType == self.inspectable.HARVESTABLE then
-        self.lastObjectId = raycastResult:getHarvestable().id
-        self.lastObjectUUID = raycastResult:getHarvestable().uuid
-
         local asHarvest = raycastResult:getHarvestable()
-
+        self.current.target = asHarvest
         self:client_setTitleLabel(self.vanillaHarvestables[tostring(asHarvest.uuid)].name)
         if (self.vanillaHarvestables[tostring(asHarvest.uuid)].iconUUID) then
             self:client_setPreview(sm.uuid.new(self.vanillaHarvestables[tostring(asHarvest.uuid)].iconUUID))
         end
+        self:client_setColor(asHarvest:getColor())
     elseif hitType == self.inspectable.TERRAIN_ASSET then
         return
     elseif hitType == self.inspectable.UNKNOWN then
@@ -515,8 +511,19 @@ function WAILA.client_displayPanel(self, raycastResult)
     self.gui:open()
     self.isShown = true
     if (math.ceil((os.clock() - startTime) * 1000) >= 10) then
-        warn("WAILA panel update took " ..
-            math.ceil((os.clock() - startTime) * 1000) .. "ms")
+        print("=[SM: WAILA NOTIFICATION]====================")
+        print("WAILA panel update took " ..
+            math.ceil((os.clock() - startTime) * 1000) ..
+            "ms" ..
+            "\nDisplaying information for: " .. self.current.type .. " (" .. tostring(self.current.target.uuid) .. ")")
+        print("=============================================")
+    elseif (math.ceil((os.clock() - startTime) * 1000) >= 50) then
+        print("=[SM: WAILA WARNING]=========================")
+        print("WAILA panel update took " ..
+            math.ceil((os.clock() - startTime) * 1000) .. "ms"
+            .. "\nDisplaying information for: " .. self.current.type .. " (" .. tostring(self.current.target.uuid) .. ")"
+        )
+        print("=============================================")
     end
 end
 
@@ -524,7 +531,12 @@ end
 --- @param self WAILA
 --- @param color Color The color to set
 function WAILA.client_setColor(self, color)
+    if (self.current.type ~= self.inspectable.INTERACTABLE) then
+        self:client_showLongColorFlair()
+        self:client_hideShortColorFlair()
+    end
     self.gui:setColor("ObjectColor", color)
+    self.gui:setColor("ObjectColorLong", color)
     self.gui:setText("ObjectColorCode", formatColorHex(color))
 end
 
@@ -609,30 +621,84 @@ function WAILA.client_setShapeStatsByUUID(self, uuid)
     self.gui:setText("ObjectStats", str)
 end
 
+--- Sets the interactable state (on/off) displayed on the WAILA panel.
+---@param self WAILA
+---@param state boolean Whether the interactable is on or off.
+function WAILA.client_setInteractableState(self, state)
+    self:client_showShortColorFlair()
+    self:client_hideLongColorFlair()
+    self:client_showInteractableStateFlair()
+    if (state) then
+        self.gui:setColor("ObjectState", sm.color.new("#57CC21"))
+        self.gui:setText("ObjectStateLabel", "ON")
+    else
+        self.gui:setColor("ObjectState", sm.color.new("#B51D18"))
+        self.gui:setText("ObjectStateLabel", "OFF")
+    end
+end
+
 function WAILA.client_hideShapeStats(self, shape)
     self.gui:setVisible("ObjectStatsPanel", false)
 end
 
 function WAILA.client_setTypeLabel(self, type)
-    local text = string.gsub(self.inspectable[type], "_", "")
-    self.gui:setText("TypeLabel", text)
+    if (self.inspectable[type] ~= nil) then
+        local text = string.gsub(self.inspectable[type], "_", "")
+        self.gui:setText("TypeLabel", text)
+    else
+        self.gui:setText("TypeLabel", "UNKNOWN")
+    end
 end
 
 --- Hides the SMWAILA panel
 --- @param self WAILA
 function WAILA.client_closePanel(self)
     self.gui:close()
-    self:client_setTitleLabel("...")
-    self:client_setPropertiesLabel("...")
+    self:client_setTitleLabel("")
+    self:client_setPropertiesLabel("")
+    self:client_setColor(sm.color.new("#ffffff"))
     self:client_clearPreview()
-    self.lastObjectId = nil
-    self.lastObjectUUID = nil
+    self:client_hideInteractableStateFlair()
     self.isShown = false
+end
+
+function WAILA.client_resetPanel(self)
+    self:client_setTitleLabel("")
+    self:client_setPropertiesLabel("")
+    self:client_setColor(sm.color.new("#ffffff"))
+    self:client_clearPreview()
+    self:client_hideInteractableStateFlair()
+    self:client_hideLongColorFlair()
 end
 
 function WAILA.client_clearPreview(self)
     self.gui:setVisible("ObjectPreviewAlternative", false)
     self.gui:setVisible("ObjectPreview", false)
+end
+
+function WAILA.client_showInteractableStateFlair(self)
+    self.gui:setVisible("ObjectState", true)
+end
+
+function WAILA.client_hideInteractableStateFlair(self)
+    self.gui:setVisible("ObjectState", false)
+end
+
+function WAILA.client_hideShortColorFlair(self)
+    self.gui:setVisible("ObjectColor", false)
+end
+
+function WAILA.client_showShortColorFlair(self)
+    self.gui:setVisible("ObjectColor", true)
+end
+
+function WAILA.client_showLongColorFlair(self)
+    self.gui:setVisible("ObjectColorLong", true)
+end
+
+function WAILA.client_hideLongColorFlair(self)
+    self.gui:setVisible("ObjectColor", true)
+    self.gui:setVisible("ObjectColorLong", false)
 end
 
 --- Returns a string representing the current mode of operation for the supplied <code>Interactable</code>
@@ -756,4 +822,11 @@ function WAILA.client_cacheShapeRatings(self)
         end
     end
     print("[SM: WAILA] Caching completed in " .. math.floor((os.clock() - start) * 1000) .. "ms")
+end
+
+--- Checks whether a supplied object has changed.
+---@param self WAILA
+---@param target Shape|Harvestable|Interactable|Joint
+function WAILA.client_hasChanged(self, target)
+
 end
