@@ -517,8 +517,10 @@ function WAILA.client_displayPanel(self, raycastResult)
     end
     self.gui:open()
     self.isShown = true
-    print("WAILA panel update took " ..
-        math.ceil((os.clock() - startTime) * 1000) .. "ms")
+    if (math.ceil((os.clock() - startTime) * 1000) >= 10) then
+        warn("WAILA panel update took " ..
+            math.ceil((os.clock() - startTime) * 1000) .. "ms")
+    end
 end
 
 --- Sets the color box's color for SMWAILA's panel
@@ -574,7 +576,7 @@ end
 ---@param shape Shape the shape whose stats to display
 function WAILA.client_setShapeStats(self, shape)
     self.gui:setVisible("ObjectStatsPanel", true)
-    local ratings = self:client_getShapeRatings(shape)
+    local ratings = self:client_getShapeRatings(shape.uuid)
 
     local str = "#ffffffBuoyancy: #FCC200" .. string.format("%.1f", shape:getBuoyancy())
         .. "   "
