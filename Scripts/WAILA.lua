@@ -8,9 +8,6 @@ dofile("$CONTENT_DATA/Scripts/util/Globals.lua")
 WAILA.gui = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_top.layout", false, {
     isHud = true, isInteractive = false, needsCursor = false
 })
-
-
--- TODO: Implement suspension
 -- Max title length: 51 char
 
 
@@ -159,9 +156,6 @@ WAILA.uninspectableInteractables = {
     ["73f838db-783e-4a41-bc0f-9008967780f3"] = "73f838db-783e-4a41-bc0f-9008967780f3"
 }
 
---- @type boolean
-WAILA.isShown = false
-
 WAILA.current = {
     --- @type Shape|Interactable|Harvestable|Character|Joint
     target = nil,
@@ -176,6 +170,10 @@ WAILA.current = {
 --- @type table<string|table>
 WAILA.cachedRatings = {}
 
+function WAILA.client_panelShown(self)
+    return self.gui:isActive()
+end
+
 function WAILA.client_onCreate(self)
     self:client_initializeGUI()
 end
@@ -188,11 +186,17 @@ end
 function WAILA.client_onFixedUpdate(self, deltaTime)
     --- @type RaycastResult
     local successful, result = sm.localPlayer.getRaycast(10)
-
     if (successful) then
+        if (not result.valid or result.type == "terrainSurface") then
+            if (self:client_panelShown()) then
+                self:client_closePanel()
+            end
+            return
+        end
+
         self:client_displayPanel(result)
     else
-        if (self.isShown) then
+        if (self:client_panelShown() or self.current.lastUpdate >= 5) then
             self:client_closePanel()
         end
     end
@@ -200,11 +204,15 @@ function WAILA.client_onFixedUpdate(self, deltaTime)
 end
 
 function WAILA.client_initializeGUI(self)
+    if (self.gui ~= nil) then
+        self:client_closePanel()
+        self.gui = nil
+    end
     self:client_setTitleLabel("Welcome to SM: WAILA")
     self:client_setPropertiesLabel(
         "You'll see information about the object you're looking here.\nFor some objects, special information is available.")
     self:client_setWAILAIcon(1)
-    if (not self.gui:isActive()) then
+    if (not self:client_panelShown()) then
         self.gui:open()
     end
 end
@@ -212,20 +220,9 @@ end
 --- Displays a WAILA panel for the <code>RaycastResult</code> supplied.
 --- @param raycastResult RaycastResult The raycast result to display a WAILA panel for.
 function WAILA.client_displayPanel(self, raycastResult)
-    if (self.current.lastUpdate <= 1 and self.isShown) then
-        --print("[SM: WAILA] Last refresh: " .. self.current.lastUpdate .. "ms")
-        return
-    end
+    if (self.current.lastUpdate <= 1 and self:client_panelShown()) then return end
     self.current.lastUpdate = 0
     local startTime = os.clock()
-    if (not raycastResult.valid) then
-        self:client_closePanel()
-        return
-    end
-    if (raycastResult.type == "terrainSurface") then
-        self:client_closePanel()
-        return
-    end
 
     if (self.gui:isActive()) then
         self.gui:close()
@@ -549,14 +546,11 @@ function WAILA.client_displayPanel(self, raycastResult)
         end
     end
     self.gui:open()
-    self.isShown = true
     if (math.ceil((os.clock() - startTime) * 1000) >= 10) then
         print("=[SM: WAILA NOTIFICATION]====================")
-        print("WAILA panel update took " ..
-            math.ceil((os.clock() - startTime) * 1000) ..
-            "ms" ..
-            "\nDisplaying information for: " ..
-            self.current.type .. " (" .. tostring((self.current.target or {}).uuid or sm.uuid.getNil()) .. ")")
+        print("WAILA panel update took " .. math.ceil((os.clock() - startTime) * 1000) .. "ms")
+        print("While displaying information for: " ..
+            self.inspectable[self.current.type] .. (tostring(self.current.target)))
         print("=============================================")
     elseif (math.ceil((os.clock() - startTime) * 1000) >= 50) then
         print("=[SM: WAILA WARNING]=========================")
@@ -694,13 +688,12 @@ end
 --- Hides the SMWAILA panel
 --- @param self WAILA
 function WAILA.client_closePanel(self)
-    self.gui:close()
     self:client_setTitleLabel("")
     self:client_setPropertiesLabel("")
     self:client_setColor(sm.color.new("#ffffff"))
     self:client_clearPreview()
     self:client_hideInteractableStateFlair()
-    self.isShown = false
+    self.gui:close()
 end
 
 function WAILA.client_resetPanel(self)
@@ -876,11 +869,4 @@ function WAILA.client_cacheShapeRatings(self)
         end
     end
     print("[SM: WAILA] Caching completed in " .. math.floor((os.clock() - start) * 1000) .. "ms")
-end
-
---- Checks whether a supplied object has changed.
----@param self WAILA
----@param target Shape|Harvestable|Interactable|Joint
-function WAILA.client_hasChanged(self, target)
-
 end
