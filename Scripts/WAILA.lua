@@ -11,7 +11,7 @@ WAILA.gui = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_top.layo
 
 
 -- TODO: Implement suspension
-
+-- Max title length: 51 char
 
 
 
@@ -27,6 +27,9 @@ WAILA.inspectable = {
     HARVESTABLE = 8,
     CONSUMABLE = 9,
     TERRAIN_ASSET = 10,
+    SUSPENSION = 11,
+    MODDED = 406,
+    HARDCODED = 405,
     UNKNOWN = 404,
     [1] = "INTERACTABLE",
     [2] = "SHAPE",
@@ -38,7 +41,10 @@ WAILA.inspectable = {
     [8] = "HARVESTABLE",
     [9] = "CONSUMABLE",
     [10] = "TERRAIN_ASSET",
-    [404] = "UNKNOWN"
+    [11] = "SUSPENSION",
+    [404] = "UNKNOWN",
+    [405] = "UNINSPECTABLE_HARDCODED",
+    [406] = "MODDED"
 }
 
 WAILA.interactableType = {
@@ -69,9 +75,6 @@ WAILA.vanillaCharacters = {
     ["9f4fde94-312f-4417-b13b-84029c5d6b52"] = { name = "Farmbot", icon = "icon_farmbot.png" },
     ["b6cafd3e-970b-4974-bb9f-ba7184b02797"] = { name = "Builderbot", icon = "../unknown_object.png" }
 }
-
--- Max title length: 51 char
-
 
 WAILA.vanillaHarvestables = {
     ["b39349ae-9b7e-48e2-8e9d-6f9dc6472fd6"] = { name = "Soil", iconUUID = "9a3e478c-2224-44fa-887c-239965bd05ad" },
@@ -138,6 +141,22 @@ WAILA.vanillaHarvestables = {
     ["e3cb14d5-9d28-45e8-96f7-fc79c60de292"] = { name = "Rare Garment Box", iconUUID = "" },
     ["cceec00b-8a34-4d68-a419-8c3bc7aa075a"] = { name = "Epic Garment Box", iconUUID = "" },
     ["6757b211-f50c-42c5-bd7c-648dcbe3ed52"] = { name = "Glowstick Remains", iconUUID = "3a3280e4-03b6-4a4d-9e02-e348478213c9" }
+}
+
+WAILA.uninspectableInteractables = {
+    -- Sport suspensions 1-5
+    ["67da25c9-3825-41f6-9724-4546a11cb2a5"] = "67da25c9-3825-41f6-9724-4546a11cb2a5",
+    ["aae686a2-0eb3-43b3-b998-def282de79e9"] = "aae686a2-0eb3-43b3-b998-def282de79e9",
+    ["d0aa2676-5266-432a-bf7e-3887e6ddedd5"] = "d0aa2676-5266-432a-bf7e-3887e6ddedd5",
+    ["d9adddcc-972d-4726-a376-67f950b99a44"] = "d9adddcc-972d-4726-a376-67f950b99a44",
+    ["52855106-a95c-4427-9970-3f227109b66d"] = "52855106-a95c-4427-9970-3f227109b66d",
+
+    -- Off-road suspensions 1-5
+    ["f3cfef9d-faef-4be8-9283-476eb99614d7"] = "f3cfef9d-faef-4be8-9283-476eb99614d7",
+    ["00284190-1484-4286-a198-b2ddef768c2e"] = "00284190-1484-4286-a198-b2ddef768c2e",
+    ["a9658eaf-0dd8-46a6-8cac-be6978f19b79"] = "a9658eaf-0dd8-46a6-8cac-be6978f19b79",
+    ["4c3f6a7c-45c6-4ed8-bf13-c247c3db6b81"] = "4c3f6a7c-45c6-4ed8-bf13-c247c3db6b81",
+    ["73f838db-783e-4a41-bc0f-9008967780f3"] = "73f838db-783e-4a41-bc0f-9008967780f3"
 }
 
 --- @type boolean
@@ -503,10 +522,31 @@ function WAILA.client_displayPanel(self, raycastResult)
         self:client_setColor(asHarvest:getColor())
     elseif hitType == self.inspectable.TERRAIN_ASSET then
         return
-    elseif hitType == self.inspectable.UNKNOWN then
-        self:client_setWAILAIcon(1)
-        self:client_setTitleLabel("Unknown part")
-        self:client_setPropertiesLabel("SMWAILA has no idea what that is.")
+    elseif (hitType == self.inspectable.HARDCODED) then
+        self:client_setTitleLabel(sm.shape.getShapeTitle(asJoint:getShapeUuid()))
+        self:client_setPreview(asJoint:getShapeUuid())
+        self.current.target = asJoint
+        self:client_setColor(asJoint:getShapeA().color)
+        self:client_setTypeLabel(self.inspectable.SUSPENSION)
+    elseif hitType == self.inspectable.UNKNOWN or hitType == self.inspectable.MODDED then
+        local type = nil
+        if (asShape ~= nil) then type = asShape end
+        if (asJoint ~= nil) then type = asJoint end
+        if (type ~= nil) then
+            self:client_setTitleLabel(sm.shape.getShapeTitle(type:getShapeUuid()))
+            self:client_setPreview(type:getShapeUuid())
+            self.current.target = type
+            self:client_setColor(type.color)
+            if (hitType == self.inspectable.UNKNOWN) then
+                self:client_setTypeLabel(self.inspectable.UNKNOWN)
+            else
+                self:client_setTypeLabel(self.inspectable.MODDED)
+            end
+        else
+            self:client_setWAILAIcon(1)
+            self:client_setTitleLabel("Unimplemented object")
+            self:client_setPropertiesLabel("SMWAILA can't inspect this object yet.\nType: " .. raycastResult.type)
+        end
     end
     self.gui:open()
     self.isShown = true
@@ -515,7 +555,8 @@ function WAILA.client_displayPanel(self, raycastResult)
         print("WAILA panel update took " ..
             math.ceil((os.clock() - startTime) * 1000) ..
             "ms" ..
-            "\nDisplaying information for: " .. self.current.type .. " (" .. tostring(self.current.target.uuid) .. ")")
+            "\nDisplaying information for: " ..
+            self.current.type .. " (" .. tostring((self.current.target or {}).uuid or sm.uuid.getNil()) .. ")")
         print("=============================================")
     elseif (math.ceil((os.clock() - startTime) * 1000) >= 50) then
         print("=[SM: WAILA WARNING]=========================")
@@ -746,13 +787,26 @@ function WAILA.client_getHitType(self, raycastResult)
             return self.inspectable.PISTON
         elseif (raycastResult:getJoint().type == "bearing") then
             return self.inspectable.BEARING
+        elseif (raycastResult:getJoint().type == "unknown") then
+            local hardcoded = self.uninspectableInteractables[tostring(raycastResult:getJoint():getShapeUuid())]
+            if (hardcoded ~= nil) then
+                return self.inspectable.HARDCODED
+            else
+                if (self:client_getShapeRatings(raycastResult:getJoint():getShapeUuid()) == nil) then
+                    return self.inspectable.MODDED
+                else
+                    return self.inspectable.UNKNOWN
+                end
+            end
         end
+        return self.inspectable.UNKNOWN
     end
     if (raycastResult:getCharacter() ~= nil) then
         return self.inspectable.CHARACTER
     end
     if (raycastResult:getHarvestable() ~= nil) then return self.inspectable.HARVESTABLE end
     if (raycastResult:getBody() ~= nil) then return self.inspectable.BODY end
+    return self.inspectable.UNKNOWN
 end
 
 --- Gets the type of interactable the supplied <code>Interactable</code> represents as a <code>WAILA.interactableType</code>.
