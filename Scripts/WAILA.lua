@@ -4,15 +4,32 @@ WAILA = class(nil)
 dofile("$CONTENT_DATA/Scripts/util/Utilities.lua")
 dofile("$CONTENT_DATA/Scripts/util/Globals.lua")
 
---- @type GuiInterface WAILA GUI
-WAILA.gui = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_top.layout", false, {
-    isHud = true, isInteractive = false, needsCursor = false
-})
--- Max title length: 51 char
+WAILA.guis = {
+    OVERLAY_TRANSPARENT = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_top_alt.layout", false, {
+        isHud = true, isInteractive = false, needsCursor = false, isOverlapped = true, hidesHotbar = false
+    }),
+    OVERLAY_OUTLINED = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_top.layout", false, {
+        isHud = true, isInteractive = false, needsCursor = false, isOverlapped = true, hidesHotbar = false
+    }),
+    MOUSE = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_mouse.layout", false, {
+        isHud = true, isInteractive = false, needsCursor = false, isOverlapped = true, hidesHotbar = false
+    }),
+    CONFIGURATION = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/configuration.layout", false, {
+        isHud = false, isInteractive = true, needsCursor = true, isOverlapped = true, hidesHotbar = true
+    })
+}
+
+---@type GuiInterface The current GUI in use.
+WAILA.gui = WAILA.guis.OVERLAY_TRANSPARENT
 
 
+-- TODO: Try to come up with a way to prevent SMWAILA from covering other GUIs.
+-- TODO: Work on creating the configuration panel
 
--- A table of all inspectable object types
+--? Types
+-- #region Types
+
+-- All available types of inspectable objects
 WAILA.inspectable = {
     INTERACTABLE = 1,
     SHAPE = 2,
@@ -44,6 +61,7 @@ WAILA.inspectable = {
     [406] = "MODDED"
 }
 
+-- All supported interactable subtypes
 WAILA.interactableType = {
     LOGIC_GATE = 1,
     TIMER = 2,
@@ -58,6 +76,19 @@ WAILA.interactableType = {
     LIGHT = 11
 }
 
+WAILA.guiThemes = {
+    TRANSPARENT = 1,
+    OUTLINED = 2,
+    [1] = "TRANSPARENT",
+    [2] = "OUTLINED"
+}
+-- #endregion Types
+
+--? Hardcoded values
+-- #region Hardcoded values
+
+
+-- All existing vanilla characters' UUID strings mapped to a table of `{name: string, icon: string}`
 WAILA.vanillaCharacters = {
     [sm.uuid.new("264a563a-e304-430f-a462-9963c77624e9")] = "Woc",
 
@@ -73,6 +104,7 @@ WAILA.vanillaCharacters = {
     ["b6cafd3e-970b-4974-bb9f-ba7184b02797"] = { name = "Builderbot", icon = "../unknown_object.png" }
 }
 
+-- All vanilla harvestables' UUIDs mapped to a table of `{name: string, iconUUID: string}`
 WAILA.vanillaHarvestables = {
     ["b39349ae-9b7e-48e2-8e9d-6f9dc6472fd6"] = { name = "Soil", iconUUID = "9a3e478c-2224-44fa-887c-239965bd05ad" },
     ["bb600268-cd29-4715-babe-5fd02645eb1c"] = { name = "Blueberry Plant (growing)", iconUUID = "6a43fff2-8c6d-4460-9f44-e5483b5267dd" },
@@ -140,6 +172,7 @@ WAILA.vanillaHarvestables = {
     ["6757b211-f50c-42c5-bd7c-648dcbe3ed52"] = { name = "Glowstick Remains", iconUUID = "3a3280e4-03b6-4a4d-9e02-e348478213c9" }
 }
 
+-- All vanilla interactables with a type of `unknown`
 WAILA.uninspectableInteractables = {
     -- Sport suspensions 1-5
     ["67da25c9-3825-41f6-9724-4546a11cb2a5"] = "67da25c9-3825-41f6-9724-4546a11cb2a5",
@@ -156,6 +189,11 @@ WAILA.uninspectableInteractables = {
     ["73f838db-783e-4a41-bc0f-9008967780f3"] = "73f838db-783e-4a41-bc0f-9008967780f3"
 }
 
+-- #endregion Hardcoded values
+
+WAILA.instance = WAILA.instance or nil
+
+-- Stores information about the current SMWAILA target (the object being inspected)
 WAILA.current = {
     --- @type Shape|Interactable|Harvestable|Character|Joint
     target = nil,
@@ -167,21 +205,79 @@ WAILA.current = {
     lastUpdate = 0
 }
 
+WAILA.saved = {}
+
+-- Vanilla objects' UUIDs mapped to their respective ratings tables. A ratings table is defined as follows:
+--[[```
+{
+    buoyancy: number,
+    durability: number,
+    friction: number,
+    density: number
+}
+```]]
 --- @type table<string|table>
 WAILA.cachedRatings = {}
 
-function WAILA.client_panelShown(self)
-    return self.gui:isActive()
-end
+-- Makes sure that the commands are only registered once in the hook.
+local commandsBound = false
+
 
 function WAILA.client_onCreate(self)
+    print("[SM: WAILA] Client side initialization")
     self:client_initializeGUI()
+    self:client_cacheShapeRatings()
 end
 
 function WAILA.server_onCreate(self)
-    print("[SM: WAILA] Initializing...")
-    self:client_cacheShapeRatings()
+    if WAILA.instance and WAILA.instance ~= self then return end
+    print("[SM: WAILA] Server side initialization")
+    self:server_initializeStorage()
+    WAILA.instance = self
 end
+
+function WAILA.client_initialize(self)
+    self:client_initializeGUI()
+end
+
+--! Black magic
+-- #region Black magic
+
+local oldBindCommand = sm.game.bindChatCommand
+
+local function bindCommandHook(command, params, callback, help)
+    oldBindCommand(command, params, callback, help)
+    if sm.isHost then
+        if (not commandsBound) then
+            oldBindCommand("/smwaila", {}, "cl_onChatCommand", "")
+            commandsBound = true
+        end
+    end
+end
+
+sm.game.bindChatCommand = bindCommandHook
+
+local oldWorldEvent = sm.event.sendToWorld
+
+local function worldEventHook(world, callback, params)
+    if not params then
+        oldWorldEvent(world, callback, params)
+        return
+    end
+
+    if (params[1] == "/smwaila") then
+        sm.event.sendToTool(WAILA.instance.tool, "server_onChatCommand", { player = WAILA.instance.tool:getOwner() })
+    end
+end
+
+sm.event.sendToWorld = worldEventHook
+
+-- #endregion Black magic
+
+
+
+--! Client side
+-- #region Client
 
 function WAILA.client_onFixedUpdate(self, deltaTime)
     --- @type RaycastResult
@@ -193,7 +289,6 @@ function WAILA.client_onFixedUpdate(self, deltaTime)
             end
             return
         end
-
         self:client_displayPanel(result)
     else
         if (self:client_panelShown() or self.current.lastUpdate >= 5) then
@@ -203,24 +298,268 @@ function WAILA.client_onFixedUpdate(self, deltaTime)
     self.current.lastUpdate = self.current.lastUpdate + 1
 end
 
+-- #endregion Client
+
+
+
+--! GUI-related
+-- #region GUI
+
 function WAILA.client_initializeGUI(self)
-    if (self.gui ~= nil) then
-        self:client_closePanel()
-        self.gui = nil
-    end
+    self:client_resetPanel()
     self:client_setTitleLabel("Welcome to SM: WAILA")
     self:client_setPropertiesLabel(
-        "You'll see information about the object you're looking here.\nFor some objects, special information is available.")
+        "You'll see information about the object you're looking at here.\nFor some objects, special information is available.")
     self:client_setWAILAIcon(1)
     if (not self:client_panelShown()) then
         self.gui:open()
     end
+
+    -- Configuration panel
+    self.guis.CONFIGURATION:createDropDown(
+        "ThemeSelector",
+        "client_onThemeChanged",
+        {
+            "Transparent",
+            "Outlined"
+        }
+    )
+    self.guis.CONFIGURATION:createDropDown(
+        "HideInSeatSelector",
+        "client_onHideBehaviourChanged",
+        {
+            "Yes",
+            "No"
+        }
+    )
+
+    self.guis.CONFIGURATION:createDropDown(
+        "ShowRatingsSelector",
+        "client_onRatingsBehaviourChanged",
+        {
+            "Yes",
+            "No"
+        }
+    )
+    self:client_applyTheme()
+end
+
+function WAILA.client_panelShown(self)
+    if (self.gui == nil) then return false end
+    return self.gui:isActive()
+end
+
+--- Sets the interactable state (on/off) displayed on the WAILA panel.
+---@param self WAILA
+---@param state boolean Whether the interactable is on or off.
+function WAILA.client_setInteractableState(self, state)
+    self:client_showShortColorFlair()
+    self:client_hideLongColorFlair()
+    self:client_showInteractableStateFlair()
+    if (state) then
+        self.gui:setColor("ObjectState", sm.color.new("#57CC21"))
+        self.gui:setText("ObjectStateLabel", "ON")
+    else
+        self.gui:setColor("ObjectState", sm.color.new("#B51D18"))
+        self.gui:setText("ObjectStateLabel", "OFF")
+    end
+end
+
+function WAILA.client_hideShapeStats(self, shape)
+    self.gui:setVisible("ObjectStatsPanel", false)
+end
+
+function WAILA.client_setTypeLabel(self, type)
+    if (self.inspectable[type] ~= nil) then
+        local text = string.gsub(self.inspectable[type], "_", "")
+        self.gui:setText("TypeLabel", text)
+    else
+        self.gui:setText("TypeLabel", "UNKNOWN")
+    end
+end
+
+function WAILA.client_openConfiguration(self)
+    self.guis.CONFIGURATION:setSelectedDropDownItem(
+        "ThemeSelector",
+        string.capitalize(self.guiThemes[self.saved.settings.theme])
+    )
+    self.guis.CONFIGURATION:setSelectedDropDownItem(
+        "HideInSeatSelector",
+        self.saved.settings.hideInSeat and "Yes" or "No"
+    )
+    self.guis.CONFIGURATION:setSelectedDropDownItem(
+        "ShowRatingsSelector",
+        self.saved.settings.showRatings and "Yes" or "No"
+    )
+    if (not self.guis.CONFIGURATION:isActive()) then
+        self.guis.CONFIGURATION:open()
+    end
+end
+
+--- Hides the SMWAILA panel
+--- @param self WAILA
+function WAILA.client_closePanel(self)
+    if (self:client_panelShown()) then
+        self:client_setTitleLabel("")
+        self:client_setPropertiesLabel("")
+        self:client_setColor(sm.color.new("#ffffff"))
+        self:client_clearPreview()
+        self:client_hideInteractableStateFlair()
+        self.gui:close()
+    end
+end
+
+function WAILA.client_resetPanel(self)
+    self:client_setTitleLabel("")
+    self:client_setPropertiesLabel("")
+    self:client_setColor(sm.color.new("#ffffff"))
+    self:client_clearPreview()
+    self:client_hideInteractableStateFlair()
+    self:client_hideLongColorFlair()
+end
+
+function WAILA.client_clearPreview(self)
+    self.gui:setVisible("ObjectPreviewAlternative", false)
+    self.gui:setVisible("ObjectPreview", false)
+end
+
+function WAILA.client_showInteractableStateFlair(self)
+    self.gui:setVisible("ObjectState", true)
+end
+
+function WAILA.client_hideInteractableStateFlair(self)
+    self.gui:setVisible("ObjectState", false)
+end
+
+function WAILA.client_hideShortColorFlair(self)
+    self.gui:setVisible("ObjectColor", false)
+end
+
+function WAILA.client_showShortColorFlair(self)
+    self.gui:setVisible("ObjectColor", true)
+end
+
+function WAILA.client_showLongColorFlair(self)
+    self.gui:setVisible("ObjectColorLong", true)
+end
+
+function WAILA.client_hideLongColorFlair(self)
+    self.gui:setVisible("ObjectColor", true)
+    self.gui:setVisible("ObjectColorLong", false)
+end
+
+--- Sets the color box's color for SMWAILA's panel
+--- @param self WAILA
+--- @param color Color The color to set
+function WAILA.client_setColor(self, color)
+    if (self.current.type ~= self.inspectable.INTERACTABLE) then
+        self:client_showLongColorFlair()
+        self:client_hideShortColorFlair()
+    end
+    self.gui:setColor("ObjectColor", color)
+    self.gui:setColor("ObjectColorLong", color)
+    self.gui:setText("ObjectColorCode", formatColorHex(color))
+end
+
+--- Sets the preview image to the icon of the supplied shapeUUID
+---@param self WAILA
+---@param shapeUUID Uuid The UUID for the shape whose icon to set the preview to
+function WAILA.client_setPreview(self, shapeUUID)
+    self.gui:setVisible("ObjectPreview", true)
+    self.gui:setVisible("ObjectPreviewAlternative", false)
+
+    self.gui:setIconImage("ObjectPreview", shapeUUID)
+end
+
+function WAILA.client_setWAILAIcon(self, type)
+    self.gui:setVisible("ObjectPreview", false)
+    self.gui:setVisible("ObjectPreviewAlternative", true)
+    if (type == 1) then
+        self.gui:setImage("ObjectPreviewAlternative", "$CONTENT_DATA/Gui/Assets/unknown_object.png")
+    elseif (type == 2) then
+
+    end
+end
+
+function WAILA.client_setCharacterIcon(self, character_icon_file)
+    self.gui:setVisible("ObjectPreview", false)
+    self.gui:setVisible("ObjectPreviewAlternative", true)
+    self.gui:setImage("ObjectPreviewAlternative", "$CONTENT_DATA/Gui/Assets/Characters/" .. character_icon_file)
+end
+
+--- Sets the title label to <code>title</code>
+---@param self WAILA
+---@param title string The title to set
+function WAILA.client_setTitleLabel(self, title)
+    self.gui:setText("ObjectTitle", title)
+end
+
+--- Sets the properties label to <code>properties</code>
+--- @param self WAILA
+--- @param properties string The text to show in the properties label.
+function WAILA.client_setPropertiesLabel(self, properties)
+    self.gui:setText("ObjectSubtitle", properties)
+end
+
+--- Updates the stats label to reflect the currently targeted shape's properties.
+---@param self WAILA
+---@param shape Shape the shape whose stats to display
+function WAILA.client_setShapeStats(self, shape)
+    if (not self.saved.settings.showRatings) then
+        self.gui:setVisible("ObjectStatsPanel", false)
+        return
+    end
+
+    self.gui:setVisible("ObjectStatsPanel", true)
+    local ratings = self:client_getShapeRatings(shape.uuid)
+
+    local str = "#ffffffBuoyancy: #FCC200" .. string.format("%.1f", shape:getBuoyancy())
+        .. "   "
+        .. "#ffffffDurability: #FCC200" .. string.format("%.1f", sm.item.getQualityLevel(shape.uuid))
+
+    if (ratings ~= nil) then
+        str = str .. "   "
+            .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction or 0)
+            .. "   "
+            .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
+    end
+
+    self.gui:setText("ObjectStats", str)
+end
+
+function WAILA.client_setShapeStatsByUUID(self, uuid)
+    if (not self.saved.settings.showRatings) then
+        self.gui:setVisible("ObjectStatsPanel", false)
+        return
+    end
+
+    self.gui:setVisible("ObjectStatsPanel", true)
+    local ratings = self:client_getShapeRatings(uuid)
+    if (ratings == nil) then
+        self.gui:setVisible("ObjectStatsPanel", false)
+        return
+    end
+
+    local str = "#ffffffBuoyancy: #FCC200" .. string.format("%.1f", ratings.buoyancy or 0)
+        .. "   "
+        .. "#ffffffDurability: #FCC200" .. string.format("%.1f", ratings.durability or 0)
+        .. "   "
+        .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction or 0)
+        .. "   "
+        .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
+
+
+    self.gui:setText("ObjectStats", str)
 end
 
 --- Displays a WAILA panel for the <code>RaycastResult</code> supplied.
 --- @param raycastResult RaycastResult The raycast result to display a WAILA panel for.
 function WAILA.client_displayPanel(self, raycastResult)
     if (self.current.lastUpdate <= 1 and self:client_panelShown()) then return end
+    if (self.saved.settings.hideInSeat and sm.localPlayer.getPlayer():getCharacter():getLockingInteractable() ~= nil) then
+        self:client_closePanel()
+        return
+    end
     self.current.lastUpdate = 0
     local startTime = os.clock()
 
@@ -545,7 +884,10 @@ function WAILA.client_displayPanel(self, raycastResult)
             self:client_setPropertiesLabel("SMWAILA can't inspect this object yet.\nType: " .. raycastResult.type)
         end
     end
+
     self.gui:open()
+
+
     if (math.ceil((os.clock() - startTime) * 1000) >= 10) then
         print("=[SM: WAILA NOTIFICATION]====================")
         print("WAILA panel update took " .. math.ceil((os.clock() - startTime) * 1000) .. "ms")
@@ -562,178 +904,46 @@ function WAILA.client_displayPanel(self, raycastResult)
     end
 end
 
---- Sets the color box's color for SMWAILA's panel
---- @param self WAILA
---- @param color Color The color to set
-function WAILA.client_setColor(self, color)
-    if (self.current.type ~= self.inspectable.INTERACTABLE) then
-        self:client_showLongColorFlair()
-        self:client_hideShortColorFlair()
-    end
-    self.gui:setColor("ObjectColor", color)
-    self.gui:setColor("ObjectColorLong", color)
-    self.gui:setText("ObjectColorCode", formatColorHex(color))
+function WAILA.client_onThemeChanged(self, value)
+    self.saved.settings.theme = self.guiThemes[string.upper(value)]
+    self.network:sendToServer("server_saveData")
+    self:client_applyTheme(self.guiThemes[string.upper(value)])
 end
 
---- Sets the preview image to the icon of the supplied shapeUUID
----@param self WAILA
----@param shapeUUID Uuid The UUID for the shape whose icon to set the preview to
-function WAILA.client_setPreview(self, shapeUUID)
-    self.gui:setVisible("ObjectPreview", true)
-    self.gui:setVisible("ObjectPreviewAlternative", false)
-
-    self.gui:setIconImage("ObjectPreview", shapeUUID)
-end
-
-function WAILA.client_setWAILAIcon(self, type)
-    self.gui:setVisible("ObjectPreview", false)
-    self.gui:setVisible("ObjectPreviewAlternative", true)
-    if (type == 1) then
-        self.gui:setImage("ObjectPreviewAlternative", "$CONTENT_DATA/Gui/Assets/unknown_object.png")
-    elseif (type == 2) then
-
-    end
-end
-
-function WAILA.client_setCharacterIcon(self, character_icon_file)
-    self.gui:setVisible("ObjectPreview", false)
-    self.gui:setVisible("ObjectPreviewAlternative", true)
-    self.gui:setImage("ObjectPreviewAlternative", "$CONTENT_DATA/Gui/Assets/Characters/" .. character_icon_file)
-end
-
---- Sets the title label to <code>title</code>
----@param self WAILA
----@param title string The title to set
-function WAILA.client_setTitleLabel(self, title)
-    self.gui:setText("ObjectTitle", title)
-end
-
---- Sets the properties label to <code>properties</code>
---- @param self WAILA
---- @param properties string The text to show in the properties label.
-function WAILA.client_setPropertiesLabel(self, properties)
-    self.gui:setText("ObjectSubtitle", properties)
-end
-
---- Updates the stats label to reflect the currently targeted shape's properties.
----@param self WAILA
----@param shape Shape the shape whose stats to display
-function WAILA.client_setShapeStats(self, shape)
-    self.gui:setVisible("ObjectStatsPanel", true)
-    local ratings = self:client_getShapeRatings(shape.uuid)
-
-    local str = "#ffffffBuoyancy: #FCC200" .. string.format("%.1f", shape:getBuoyancy())
-        .. "   "
-        .. "#ffffffDurability: #FCC200" .. string.format("%.1f", sm.item.getQualityLevel(shape.uuid))
-
-    if (ratings ~= nil) then
-        str = str .. "   "
-            .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction or 0)
-            .. "   "
-            .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
-    end
-
-    self.gui:setText("ObjectStats", str)
-end
-
-function WAILA.client_setShapeStatsByUUID(self, uuid)
-    self.gui:setVisible("ObjectStatsPanel", true)
-    local ratings = self:client_getShapeRatings(uuid)
-    if (ratings == nil) then
-        self.gui:setVisible("ObjectStatsPanel", false)
-        return
-    end
-
-    local str = "#ffffffBuoyancy: #FCC200" .. string.format("%.1f", ratings.buoyancy or 0)
-        .. "   "
-        .. "#ffffffDurability: #FCC200" .. string.format("%.1f", ratings.durability or 0)
-        .. "   "
-        .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction or 0)
-        .. "   "
-        .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
-
-
-    self.gui:setText("ObjectStats", str)
-end
-
---- Sets the interactable state (on/off) displayed on the WAILA panel.
----@param self WAILA
----@param state boolean Whether the interactable is on or off.
-function WAILA.client_setInteractableState(self, state)
-    self:client_showShortColorFlair()
-    self:client_hideLongColorFlair()
-    self:client_showInteractableStateFlair()
-    if (state) then
-        self.gui:setColor("ObjectState", sm.color.new("#57CC21"))
-        self.gui:setText("ObjectStateLabel", "ON")
+function WAILA.client_onHideBehaviourChanged(self, value)
+    if (value == "Yes") then
+        self.saved.settings.hideInSeat = true
     else
-        self.gui:setColor("ObjectState", sm.color.new("#B51D18"))
-        self.gui:setText("ObjectStateLabel", "OFF")
+        self.saved.settings.hideInSeat = false
     end
+    self.network:sendToServer("server_saveData")
 end
 
-function WAILA.client_hideShapeStats(self, shape)
-    self.gui:setVisible("ObjectStatsPanel", false)
-end
-
-function WAILA.client_setTypeLabel(self, type)
-    if (self.inspectable[type] ~= nil) then
-        local text = string.gsub(self.inspectable[type], "_", "")
-        self.gui:setText("TypeLabel", text)
+function WAILA.client_onRatingsBehaviourChanged(self, value)
+    if (value == "Yes") then
+        self.saved.settings.showRatings = true
     else
-        self.gui:setText("TypeLabel", "UNKNOWN")
+        self.saved.settings.showRatings = false
+    end
+    self.network:sendToServer("server_saveData")
+end
+
+function WAILA.client_applyTheme(self)
+    if (self.saved.settings.theme == self.guiThemes.TRANSPARENT) then
+        self.gui:close()
+        self.gui = self.guis.OVERLAY_TRANSPARENT
+    elseif (self.saved.settings.theme == self.guiThemes.OUTLINED) then
+        self.gui:close()
+        self.gui = self.guis.OVERLAY_OUTLINED
     end
 end
 
---- Hides the SMWAILA panel
---- @param self WAILA
-function WAILA.client_closePanel(self)
-    self:client_setTitleLabel("")
-    self:client_setPropertiesLabel("")
-    self:client_setColor(sm.color.new("#ffffff"))
-    self:client_clearPreview()
-    self:client_hideInteractableStateFlair()
-    self.gui:close()
-end
+-- #endregion GUI
 
-function WAILA.client_resetPanel(self)
-    self:client_setTitleLabel("")
-    self:client_setPropertiesLabel("")
-    self:client_setColor(sm.color.new("#ffffff"))
-    self:client_clearPreview()
-    self:client_hideInteractableStateFlair()
-    self:client_hideLongColorFlair()
-end
 
-function WAILA.client_clearPreview(self)
-    self.gui:setVisible("ObjectPreviewAlternative", false)
-    self.gui:setVisible("ObjectPreview", false)
-end
 
-function WAILA.client_showInteractableStateFlair(self)
-    self.gui:setVisible("ObjectState", true)
-end
-
-function WAILA.client_hideInteractableStateFlair(self)
-    self.gui:setVisible("ObjectState", false)
-end
-
-function WAILA.client_hideShortColorFlair(self)
-    self.gui:setVisible("ObjectColor", false)
-end
-
-function WAILA.client_showShortColorFlair(self)
-    self.gui:setVisible("ObjectColor", true)
-end
-
-function WAILA.client_showLongColorFlair(self)
-    self.gui:setVisible("ObjectColorLong", true)
-end
-
-function WAILA.client_hideLongColorFlair(self)
-    self.gui:setVisible("ObjectColor", true)
-    self.gui:setVisible("ObjectColorLong", false)
-end
+--! Utils
+-- #region Utils
 
 --- Returns a string representing the current mode of operation for the supplied <code>Interactable</code>
 --- @param self WAILA
@@ -870,3 +1080,32 @@ function WAILA.client_cacheShapeRatings(self)
     end
     print("[SM: WAILA] Caching completed in " .. math.floor((os.clock() - start) * 1000) .. "ms")
 end
+
+-- #endregion Utility
+
+
+
+--! Server side
+-- #region Server
+
+function WAILA.server_onChatCommand(self, params)
+    self.network:sendToClient(params.player, "client_openConfiguration", {})
+end
+
+function WAILA.server_initializeStorage(self)
+    self.saved = self.storage:load() or {
+        settings = {
+            theme = "Outlined",
+            hideInSeat = false,
+            showRatings = true
+        }
+    }
+end
+
+function WAILA.server_saveData(self)
+    if (self.saved ~= nil) then
+        self.storage:save(self.saved)
+    end
+end
+
+-- #endregion Server

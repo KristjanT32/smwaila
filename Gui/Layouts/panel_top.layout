@@ -2,23 +2,23 @@
 <MyGUI type="Layout" version="3.2.0">
     <Widget type="Widget" skin="DropDownBackground" position_real="0.33072916666666669 0.019444444444444445 0.33854166666666669 0.11944444444444445" name="MainPanel">
         <Property key="Colour" value="1 1 1"/>
-        <Widget type="ItemBox" skin="InteractionBindingBackground" position="15 10 105 105" name="ObjectPreviewBG">
+        <Widget type="ItemBox" skin="InteractionBindingBackground" position_real="0.023076923076923078 0.077519379844961239 0.16153846153846155 0.81395348837209303" name="ObjectPreviewBG">
             <Property key="Colour" value="0.116959 0.116959 0.116959"/>
         </Widget>
-        <Widget type="TextBox" skin="TextBox" position="140 15 340 35" align="Left VCenter" name="ObjectTitle">
+        <Widget type="TextBox" skin="TextBox" position_real="0.2153846153846154 0.11627906976744186 0.52307692307692311 0.27131782945736432" align="Left VCenter" name="ObjectTitle">
             <Property key="FontName" value="SM_ItemTitle"/>
             <Property key="TextAlign" value="Left VCenter"/>
             <Property key="Caption" value="Item Title"/>
         </Widget>
-        <Widget type="TextBox" skin="TextBox" position="140 50 340 60" align="Left Top" name="ObjectSubtitle">
+        <Widget type="TextBox" skin="TextBox" position_real="0.2153846153846154 0.38759689922480622 0.52307692307692311 0.46511627906976744" align="Left Top" name="ObjectSubtitle">
             <Property key="TextAlign" value="Left Top"/>
             <Property key="Caption" value="Item properties, description etc."/>
         </Widget>
-        <Widget type="ImageBox" skin="ImageBox" position="20 15 95 95" align="Center" name="ObjectPreview"/>
-        <Widget type="ImageBox" skin="ImageBox" position="20 15 95 95" align="Center" name="ObjectPreviewAlternative"/>
+        <Widget type="ImageBox" skin="ImageBox" position_real="0.030769230769230771 0.11627906976744186 0.14615384615384616 0.73643410852713176" align="Center" name="ObjectPreview"/>
+        <Widget type="ImageBox" skin="ImageBox" position_real="0.030769230769230771 0.11627906976744186 0.14615384615384616 0.73643410852713176" align="Center" name="ObjectPreviewAlternative"/>
         <Widget type="ImageBox" skin="InteractionBindingBackground" position="550 50 80 25" name="ObjectColor">
             <Property key="Colour" value="1 1 1"/>
-            <Widget type="TextBox" skin="TextBox" position="0 0 80 25" name="ObjectColorCode">
+            <Widget type="TextBox" skin="TextBox" position_real="0 0 1 1" name="ObjectColorCode">
                 <Property key="FontName" value="SM_ItemTitle"/>
                 <Property key="TextAlign" value="Center"/>
                 <Property key="FontHeight" value="18"/>
@@ -26,9 +26,9 @@
                 <Property key="TextShadowColour" value="0 0 0"/>
             </Widget>
         </Widget>
-        <Widget type="ImageBox" skin="InteractionBindingBackground" position="495 50 135 25" name="ObjectColorLong">
+        <Widget type="ImageBox" skin="InteractionBindingBackground" position_real="0.7615384615384615 0.38759689922480622 0.2076923076923077 0.19379844961240311" name="ObjectColorLong">
             <Property key="Colour" value="1 1 1"/>
-            <Widget type="TextBox" skin="TextBox" position="0 0 135 25" name="ObjectColorCode">
+            <Widget type="TextBox" skin="TextBox" position_real="0 0 1 1" name="ObjectColorCode">
                 <Property key="FontName" value="SM_ItemTitle"/>
                 <Property key="TextAlign" value="Center"/>
                 <Property key="FontHeight" value="18"/>
@@ -36,16 +36,16 @@
                 <Property key="TextShadowColour" value="0 0 0"/>
             </Widget>
         </Widget>
-        <Widget type="ImageBox" skin="InteractionBindingBackground" position="495 50 50 25" name="ObjectState">
-            <Widget type="TextBox" skin="TextBox" position="0 0 50 25" name="ObjectStateLabel">
+        <Widget type="ImageBox" skin="InteractionBindingBackground" position_real="0.7615384615384615 0.38759689922480622 0.076923076923076927 0.19379844961240311" name="ObjectState">
+            <Widget type="TextBox" skin="TextBox" position_real="0 0 1 1" name="ObjectStateLabel">
                 <Property key="FontName" value="SM_ItemTitle"/>
                 <Property key="TextAlign" value="Center"/>
                 <Property key="FontHeight" value="18"/>
             </Widget>
         </Widget>
     </Widget>
-    <Widget type="Widget" skin="InteractionBindingBackground" position="1130 40 135 25" name="TypeLabelBG">
-        <Widget type="TextBox" skin="TextBox" position="-5 -5 145 35" name="TypeLabel">
+    <Widget type="Widget" skin="InteractionBindingBackground" position_real="0.58854166666666663 0.037037037037037035 0.0703125 0.023148148148148147" name="TypeLabelBG">
+        <Widget type="TextBox" skin="TextBox" position_real="-0.037037037037037035 -0.20000000000000001 1.0740740740740742 1.3999999999999999" name="TypeLabel">
             <Property key="FontName" value="SM_ButtonSmall"/>
             <Property key="TextAlign" value="Center"/>
             <Property key="TextColour" value="0 0 0"/>
@@ -53,10 +53,9 @@
         </Widget>
     </Widget>
     <Widget type="Widget" skin="DropDownBackground" position_real="0.33072916666666669 0.1388888888888889 0.33854166666666669 0.032407407407407406" name="ObjectStatsPanel">
-        <Widget type="TextBox" skin="TextBox" position="10 0 630 30" name="ObjectStats">
+        <Widget type="TextBox" skin="TextBox" position_real="0.015384615384615385 0 0.96923076923076923 0.8571428571428571" name="ObjectStats">
             <Property key="TextAlign" value="Center"/>
-            <Property key="FontName" value="SM_ItemTitle"/>
-            <Property key="FontHeight" value="20"/>
+            <Property key="FontName" value="SM_LabelSmall"/>
         </Widget>
     </Widget>
     <CodeGeneratorSettings/>

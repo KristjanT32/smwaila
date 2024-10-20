@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<MyGUI type="Layout" version="3.2.0">
+    <Widget type="Widget" skin="HudBackgroundLarge" position_real="0.25 0.14999999999999999 0.5 0.65000000000000002" name="MainPanel">
+        <Widget type="TextBox" skin="TextBox" position_real="0.005208333333333333 0.049857549857549859 0.98958333333333337 0.12108262108262108">
+            <Property key="TextAlign" value="Center"/>
+            <Property key="FontName" value="SM_HeaderLarge_Medium"/>
+            <Property key="Caption" value="SMWAILA CONFIGURATION"/>
+        </Widget>
+        <Widget type="TextBox" skin="TextBox" position_real="0.067708333333333329 0.29914529914529914 0.41666666666666669 0.076923076923076927">
+            <Property key="Caption" value="Panel theme"/>
+            <Property key="FontName" value="SM_TextLabel"/>
+            <Property key="TextAlign" value="Left VCenter"/>
+        </Widget>
+        <Widget type="Widget" skin="PanelEmpty" position_real="0.48958333333333331 0.29914529914529914 0.453125 0.076923076923076927" name="ThemeSelector"/>
+        <Widget type="TextBox" skin="TextBox" position_real="0.067708333333333329 0.51282051282051277 0.41666666666666669 0.078347578347578342">
+            <Property key="Caption" value="Show object ratings (durability, friction etc.)?"/>
+            <Property key="FontName" value="SM_TextLabel"/>
+            <Property key="TextAlign" value="Left VCenter"/>
+        </Widget>
+        <Widget type="Widget" skin="PanelEmpty" position_real="0.48958333333333331 0.40598290598290598 0.453125 0.076923076923076927" name="HideInSeatSelector"/>
+        <Widget type="TextBox" skin="TextBox" position_real="0.067708333333333329 0.40598290598290598 0.41666666666666669 0.078347578347578342">
+            <Property key="Caption" value="Hide SMWAILA panel when in seat?"/>
+            <Property key="FontName" value="SM_TextLabel"/>
+            <Property key="TextAlign" value="Left VCenter"/>
+        </Widget>
+        <Widget type="Widget" skin="PanelEmpty" position_real="0.48958333333333331 0.51139601139601143 0.453125 0.076923076923076927" name="ShowRatingsSelector"/>
+    </Widget>
+    <CodeGeneratorSettings/>
+</MyGUI>

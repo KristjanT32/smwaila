@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<MyGUI type="Layout" version="3.2.0">
+    <Widget type="Canvas" skin="Canvas" position="1010 5 10 10">
+        <Property key="Alpha" value="0"/>
+        <Property key="Visible" value="false"/>
+        <Property key="NeedMouse" value="false"/>
+        <Property key="NeedKey" value="false"/>
+        <Property key="InheritsPick" value="false"/>
+        <Property key="InheritsAlpha" value="false"/>
+        <Property key="Enabled" value="false"/>
+    </Widget>
+    <CodeGeneratorSettings/>
+</MyGUI>

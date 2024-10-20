@@ -82,3 +82,11 @@ end
 function blocksInShape(shape)
     return (shape:getBoundingBox().x / 0.25) * (shape:getBoundingBox().y / 0.25) * (shape:getBoundingBox().z / 0.25)
 end
+
+--- Returns a string with only its first letter capitalized.
+---@param str string The string to capitalize.
+---@return string capitalized A capitalized string.
+function string.capitalize(str)
+    local capitalized = str:lower()
+    return string.sub(capitalized, 1, 1):upper() .. string.sub(capitalized, 2, capitalized:len())
+end
