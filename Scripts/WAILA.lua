@@ -1125,9 +1125,10 @@ end
 function WAILA.server_initializeStorage(self)
     self.saved = self.storage:load() or {
         settings = {
-            theme = "Outlined",
+            theme = self.guiThemes.OUTLINED,
             hideInSeat = false,
-            showRatings = true
+            showRatings = true,
+            enabled = true
         }
     }
 end
