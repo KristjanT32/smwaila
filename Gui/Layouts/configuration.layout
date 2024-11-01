@@ -12,18 +12,28 @@
             <Property key="TextAlign" value="Left VCenter"/>
         </Widget>
         <Widget type="Widget" skin="PanelEmpty" position_real="0.48958333333333331 0.29914529914529914 0.453125 0.076923076923076927" name="ThemeSelector"/>
-        <Widget type="TextBox" skin="TextBox" position_real="0.067708333333333329 0.51282051282051277 0.41666666666666669 0.078347578347578342">
+        <Widget type="TextBox" skin="TextBox" position_real="0.067708333333333329 0.51139601139601143 0.41666666666666669 0.076923076923076927">
             <Property key="Caption" value="Show object ratings (durability, friction etc.)?"/>
             <Property key="FontName" value="SM_TextLabel"/>
             <Property key="TextAlign" value="Left VCenter"/>
         </Widget>
         <Widget type="Widget" skin="PanelEmpty" position_real="0.48958333333333331 0.40598290598290598 0.453125 0.076923076923076927" name="HideInSeatSelector"/>
-        <Widget type="TextBox" skin="TextBox" position_real="0.067708333333333329 0.40598290598290598 0.41666666666666669 0.078347578347578342">
+        <Widget type="TextBox" skin="TextBox" position_real="0.067708333333333329 0.40598290598290598 0.41666666666666669 0.076923076923076927">
             <Property key="Caption" value="Hide SMWAILA panel when in seat?"/>
             <Property key="FontName" value="SM_TextLabel"/>
             <Property key="TextAlign" value="Left VCenter"/>
         </Widget>
         <Widget type="Widget" skin="PanelEmpty" position_real="0.48958333333333331 0.51139601139601143 0.453125 0.076923076923076927" name="ShowRatingsSelector"/>
+        <Widget type="Button" skin="PrimaryButton" position_real="0.48958333333333331 0.61965811965811968 0.453125 0.076923076923076927" name="SMWAILAToggle">
+            <Property key="FontName" value="SM_Button"/>
+            <Property key="Caption" value="SMWAILA ENABLED"/>
+            <Property key="TextAlign" value="Center"/>
+        </Widget>
+        <Widget type="TextBox" skin="TextBox" position_real="0.067708333333333329 0.61965811965811968 0.41666666666666669 0.076923076923076927">
+            <Property key="FontName" value="SM_TextLabel"/>
+            <Property key="TextAlign" value="Left VCenter"/>
+            <Property key="Caption" value="Enable SMWAILA?"/>
+        </Widget>
     </Widget>
     <CodeGeneratorSettings/>
 </MyGUI>

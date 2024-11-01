@@ -38,7 +38,7 @@
         </Widget>
         <Widget type="ImageBox" skin="InteractionBindingBackground" position_real="0.7615384615384615 0.38759689922480622 0.076923076923076927 0.19379844961240311" name="ObjectState">
             <Widget type="TextBox" skin="TextBox" position_real="0 0 1 1" name="ObjectStateLabel">
-                <Property key="FontName" value="SM_ItemTitle"/>
+                <Property key="FontName" value="SM_ButtonSmall"/>
                 <Property key="TextAlign" value="Center"/>
                 <Property key="FontHeight" value="18"/>
             </Widget>

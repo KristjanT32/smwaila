@@ -219,6 +219,9 @@ WAILA.saved = {}
 --- @type table<string|table>
 WAILA.cachedRatings = {}
 
+--- @type boolean Controls whether SMWAILA is enabled.
+WAILA.enabled = true
+
 -- Makes sure that the commands are only registered once in the hook.
 local commandsBound = false
 
@@ -280,6 +283,12 @@ sm.event.sendToWorld = worldEventHook
 -- #region Client
 
 function WAILA.client_onFixedUpdate(self, deltaTime)
+    if (not self.enabled) then
+        if (self.gui:isActive()) then
+            self:client_closePanel()
+        end
+        return
+    end
     --- @type RaycastResult
     local successful, result = sm.localPlayer.getRaycast(10)
     if (successful) then
@@ -341,6 +350,8 @@ function WAILA.client_initializeGUI(self)
             "No"
         }
     )
+
+    self.guis.CONFIGURATION:setButtonCallback("SMWAILAToggle", "client_toggleSMWAILA")
     self:client_applyTheme()
 end
 
@@ -391,6 +402,13 @@ function WAILA.client_openConfiguration(self)
         "ShowRatingsSelector",
         self.saved.settings.showRatings and "Yes" or "No"
     )
+
+    if (self.enabled) then
+        self.guis.CONFIGURATION:setText("SMWAILAToggle", "Yes")
+    else
+        self.guis.CONFIGURATION:setText("SMWAILAToggle", "No")
+    end
+
     if (not self.guis.CONFIGURATION:isActive()) then
         self.guis.CONFIGURATION:open()
     end
@@ -925,6 +943,18 @@ function WAILA.client_onRatingsBehaviourChanged(self, value)
     else
         self.saved.settings.showRatings = false
     end
+    self.network:sendToServer("server_saveData")
+end
+
+function WAILA.client_toggleSMWAILA(self)
+    self.enabled = not self.enabled
+    self.saved.enabled = self.enabled
+    if (self.enabled) then
+        self.guis.CONFIGURATION:setText("SMWAILAToggle", "Yes")
+    else
+        self.guis.CONFIGURATION:setText("SMWAILAToggle", "No")
+    end
+
     self.network:sendToServer("server_saveData")
 end
 
