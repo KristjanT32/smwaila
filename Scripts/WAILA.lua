@@ -1,17 +1,18 @@
 --- @class WAILA : ToolClass
 WAILA = class(nil)
+WAILA.instance = nil
 
 dofile("$CONTENT_DATA/Scripts/util/Utilities.lua")
 dofile("$CONTENT_DATA/Scripts/util/Globals.lua")
 
 WAILA.guis = {
-    OVERLAY_TRANSPARENT = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_top_alt.layout", false, {
+    OVERLAY_TRANSPARENT = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/waila_transparent.layout", false, {
         isHud = true, isInteractive = false, needsCursor = false, isOverlapped = true, hidesHotbar = false
     }),
-    OVERLAY_OUTLINED = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_top.layout", false, {
+    OVERLAY_OUTLINED = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/waila_outlined.layout", false, {
         isHud = true, isInteractive = false, needsCursor = false, isOverlapped = true, hidesHotbar = false
     }),
-    MOUSE = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/panel_mouse.layout", false, {
+    STEERING_OUTLINED = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/steering_panel_outlined.layout", false, {
         isHud = true, isInteractive = false, needsCursor = false, isOverlapped = true, hidesHotbar = false
     }),
     CONFIGURATION = sm.gui.createGuiFromLayout("$CONTENT_DATA/Gui/Layouts/configuration.layout", false, {
@@ -191,8 +192,6 @@ WAILA.uninspectableInteractables = {
 
 -- #endregion Hardcoded values
 
-WAILA.instance = WAILA.instance or nil
-
 -- Stores information about the current SMWAILA target (the object being inspected)
 WAILA.current = {
     --- @type Shape|Interactable|Harvestable|Character|Joint
@@ -233,10 +232,11 @@ function WAILA.client_onCreate(self)
 end
 
 function WAILA.server_onCreate(self)
-    if WAILA.instance and WAILA.instance ~= self then return end
     print("[SM: WAILA] Server side initialization")
     self:server_initializeStorage()
-    WAILA.instance = self
+    if not WAILA.instance or WAILA.instance ~= self then
+        WAILA.instance = self
+    end
 end
 
 function WAILA.client_initialize(self)
@@ -268,8 +268,11 @@ local function worldEventHook(world, callback, params)
         return
     end
 
-    if (params[1] == "/smwaila") then
-        sm.event.sendToTool(WAILA.instance.tool, "server_onChatCommand", { player = WAILA.instance.tool:getOwner() })
+    if (params[1] == "/smwaila" or type(params) == "player") then
+        sm.event.sendToTool(WAILA.instance.tool, "server_onRequestConfigurationCommand",
+            { player = WAILA.instance.tool:getOwner() })
+    else
+        oldWorldEvent(world, callback, params)
     end
 end
 
@@ -466,14 +469,26 @@ function WAILA.client_hideLongColorFlair(self)
     self.gui:setVisible("ObjectColorLong", false)
 end
 
+--- Sets the flair mode of the WAILA panel (whether 2 flairs are shown, or just one)
+---@param self WAILA
+---@param mode number The mode number - `1` - only colour (default), `2` - color and state
+function WAILA.client_setFlairMode(self, mode)
+    if (mode == nil) then mode = 1 end
+    if (mode == 1) then
+        self:client_hideShortColorFlair()
+        self:client_hideInteractableStateFlair()
+        self:client_showLongColorFlair()
+    elseif (mode == 2) then
+        self:client_hideLongColorFlair()
+        self:client_showShortColorFlair()
+        self:client_showInteractableStateFlair()
+    end
+end
+
 --- Sets the color box's color for SMWAILA's panel
 --- @param self WAILA
 --- @param color Color The color to set
 function WAILA.client_setColor(self, color)
-    if (self.current.type ~= self.inspectable.INTERACTABLE) then
-        self:client_showLongColorFlair()
-        self:client_hideShortColorFlair()
-    end
     self.gui:setColor("ObjectColor", color)
     self.gui:setColor("ObjectColorLong", color)
     self.gui:setText("ObjectColorCode", formatColorHex(color))
@@ -574,9 +589,18 @@ end
 --- @param raycastResult RaycastResult The raycast result to display a WAILA panel for.
 function WAILA.client_displayPanel(self, raycastResult)
     if (self.current.lastUpdate <= 1 and self:client_panelShown()) then return end
-    if (self.saved.settings.hideInSeat and sm.localPlayer.getPlayer():getCharacter():getLockingInteractable() ~= nil) then
-        self:client_closePanel()
-        return
+    if (sm.localPlayer.getPlayer():getCharacter():getLockingInteractable() ~= nil) then
+        if (self.saved.settings.hideInSeat) then
+            self:client_closePanel()
+            return
+        end
+
+        --[[
+        if (self.saved.settings.showSteeringPanel) then
+            local seat = sm.localPlayer.getPlayer():getCharacter():getLockingInteractable()
+            self:client_displaySteeringPanel()
+        end
+        ]]
     end
     self.current.lastUpdate = 0
     local startTime = os.clock()
@@ -628,6 +652,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         self.current.target = asShape
 
         self:client_setColor(asShape.color)
+        self:client_setFlairMode(1)
         if (asShape.isBlock) then
             local _body = asBody
             local _shapes = {}
@@ -662,13 +687,43 @@ function WAILA.client_displayPanel(self, raycastResult)
             end
 
             self:client_setTitleLabel(sm.shape.getShapeTitle(asShape.uuid) .. " #FCC200x" .. blocks)
-            self:client_setPropertiesLabel("Mass: #FCC200" ..
-                string.format("%.1f", mass) ..
-                " kg\n#FFFFFFBuoyancy: #FCC200" .. string.format("%.1f", asShape:getBuoyancy()))
+            local parentJoint = self:client_findParentJoint(asShape)
+            if (parentJoint ~= nil and parentJoint.type == "bearing") then
+                if (math.abs(parentJoint:getAngularVelocity()) > 0) then
+                    self:client_setPropertiesLabel("Mass: #FCC200" ..
+                        string.format("%.1f", mass) .. "\n#FFFFFFSpeed: #FCC200" ..
+                        math.floor(parentJoint:getAngularVelocity()) ..
+                        " #ffffffrad/s (#FCC200" ..
+                        math.ceil(math.deg(parentJoint:getAngularVelocity())) ..
+                        "#ffffff °/s)" ..
+                        "\n#ffffffAngle: #FCC200" .. math.floor(math.deg(parentJoint:getAngle())) .. " #ffffff°")
+                else
+                    self:client_setPropertiesLabel("Mass: #FCC200" ..
+                        string.format("%.1f", mass) ..
+                        " kg\n#FFFFFFBuoyancy: #FCC200" .. string.format("%.1f", asShape:getBuoyancy()))
+                end
+            else
+                self:client_setPropertiesLabel("Mass: #FCC200" ..
+                    string.format("%.1f", mass) ..
+                    " kg\n#FFFFFFBuoyancy: #FCC200" .. string.format("%.1f", asShape:getBuoyancy()))
+            end
             self:client_setPreview(asShape.uuid)
         else
             self:client_setTitleLabel(sm.shape.getShapeTitle(asShape.uuid))
             self:client_setPreview(asShape.uuid)
+
+            ---@type Joint | nil
+            local parentJoint = self:client_findParentJoint(asShape)
+            if (parentJoint ~= nil and parentJoint.type == "bearing") then
+                if (math.abs(parentJoint:getAngularVelocity()) > 0) then
+                    self:client_setPropertiesLabel("Speed: #FCC200" ..
+                        math.floor(parentJoint:getAngularVelocity()) ..
+                        " #ffffffrad/s (#FCC200" ..
+                        math.ceil(math.deg(parentJoint:getAngularVelocity())) ..
+                        "#ffffff °/s)" ..
+                        "\n#ffffffAngle: #FCC200" .. math.floor(math.deg(parentJoint:getAngle())) .. " #ffffff°")
+                end
+            end
         end
     elseif (hitType == self.inspectable.INTERACTABLE) then
         local asInter = asShape:getInteractable()
@@ -732,6 +787,18 @@ function WAILA.client_displayPanel(self, raycastResult)
             end
         elseif (type == self.interactableType.CONTROLLER) then
             self:client_setTitleLabel(sm.shape.getShapeTitle(asInter:getShape().uuid))
+            local _active = false
+            if (sizeof(asInter:getParents(1)) > 0) then
+                for _, inter in pairs(asInter:getParents(1)) do
+                    if (inter.active) then
+                        _active = true
+                        break
+                    end
+                end
+            else
+                _active = asInter.active
+            end
+            self:client_setInteractableState(_active)
             local controlledByLabel = ""
             local controlsLabel = ""
             if (asInter:getSingleParent() ~= nil) then
@@ -770,6 +837,7 @@ function WAILA.client_displayPanel(self, raycastResult)
 
             self:client_setTitleLabel(sm.shape.getShapeTitle(asInter.shape.uuid))
             self:client_setColor(asInter.shape.color)
+            self:client_setFlairMode(1)
         elseif (type == self.interactableType.RADIO or type == self.interactableType.LIGHT) then
             self:client_setInteractableState(asInter.active)
 
@@ -796,6 +864,24 @@ function WAILA.client_displayPanel(self, raycastResult)
         else
             self:client_setTitleLabel(sm.shape.getShapeTitle(asInter.shape.uuid))
             self:client_setColor(asInter.shape.color)
+
+
+            local _active = false
+            if (self:client_getInteractablePowerable(asInter)) then
+                if (sizeof(asInter:getParents(1)) > 0) then
+                    for _, inter in pairs(asInter:getParents(1)) do
+                        if (inter.active) then
+                            _active = true
+                            break
+                        end
+                    end
+                else
+                    _active = asInter.active
+                end
+                self:client_setInteractableState(_active)
+            else
+                self:client_setFlairMode(1)
+            end
         end
         self:client_setColor(asInter.shape.color)
     elseif (hitType == self.inspectable.CONSUMABLE) then
@@ -809,8 +895,10 @@ function WAILA.client_displayPanel(self, raycastResult)
     elseif (hitType == self.inspectable.PISTON) then
         self:client_setTitleLabel(sm.shape.getShapeTitle(asJoint:getShapeUuid()))
         self:client_setPreview(asJoint:getShapeUuid())
+        self:client_setFlairMode(2)
         self.current.target = asJoint
 
+        self:client_setInteractableState(asJoint:getLength() > 1.5)
         if (asJoint:getLength() < 1.5) then
             self:client_setPropertiesLabel("Not extended")
         else
@@ -822,6 +910,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         self.current.target = asJoint
         self:client_setTitleLabel(sm.shape.getShapeTitle(asJoint:getShapeUuid()))
         self:client_setPreview(asJoint:getShapeUuid())
+        self:client_setFlairMode(1)
         self:client_setPropertiesLabel("Speed: #FCC200" ..
             math.floor(asJoint:getAngularVelocity()) ..
             " #ffffffrad/s (#FCC200" ..
@@ -829,6 +918,7 @@ function WAILA.client_displayPanel(self, raycastResult)
             "#ffffff °/s)" .. "\n#ffffffAngle: #FCC200" .. math.floor(math.deg(asJoint:getAngle())) .. " #ffffff°")
         self:client_setColor(asJoint:getShapeA().color)
     elseif (hitType == self.inspectable.LIFT) then
+        self:client_setFlairMode(1)
         self.current.target = asLift
         if (sm.localPlayer.getOwnedLift() == asLift) then
             self:client_setTitleLabel("Your Lift")
@@ -840,6 +930,7 @@ function WAILA.client_displayPanel(self, raycastResult)
             asLift.id .. "\n#ffffffHeight: #FCC200" .. asLift.level .. " blocks")
         self:client_setPreview(sm.uuid.new("5cc12f03-275e-4c8e-b013-79fc0f913e1b"))
     elseif (hitType == self.inspectable.CHARACTER) then
+        self:client_setFlairMode(1)
         self.current.target = asChar
         if (asChar:getPlayer() ~= nil) then
             self:client_setTitleLabel(asChar:getPlayer().name)
@@ -867,6 +958,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         end
         --self:client_setPreview(sm.uuid.new("068a89ca-504e-4782-9ede-48f710aeea73"))
     elseif hitType == self.inspectable.HARVESTABLE then
+        self:client_setFlairMode(1)
         local asHarvest = raycastResult:getHarvestable()
         self.current.target = asHarvest
         self:client_setTitleLabel(self.vanillaHarvestables[tostring(asHarvest.uuid)].name)
@@ -881,6 +973,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         self:client_setPreview(asJoint:getShapeUuid())
         self.current.target = asJoint
         self:client_setColor(asJoint:getShapeA().color)
+        self:client_setFlairMode(1)
         self:client_setTypeLabel(self.inspectable.SUSPENSION)
     elseif hitType == self.inspectable.UNKNOWN or hitType == self.inspectable.MODDED then
         local type = nil
@@ -907,25 +1000,44 @@ function WAILA.client_displayPanel(self, raycastResult)
 
 
     if (math.ceil((os.clock() - startTime) * 1000) >= 10) then
-        print("=[SM: WAILA NOTIFICATION]====================")
-        print("WAILA panel update took " .. math.ceil((os.clock() - startTime) * 1000) .. "ms")
-        print("While displaying information for: " ..
-            self.inspectable[self.current.type] .. (tostring(self.current.target)))
-        print("=============================================")
-    elseif (math.ceil((os.clock() - startTime) * 1000) >= 50) then
-        print("=[SM: WAILA WARNING]=========================")
-        print("WAILA panel update took " ..
-            math.ceil((os.clock() - startTime) * 1000) .. "ms"
-            .. "\nDisplaying information for: " .. self.current.type .. " (" .. tostring(self.current.target.uuid) .. ")"
+        self:client_showNotification({
+                "Panel update took more time than usual",
+                "Update took: "
+                .. math.ceil((os.clock() - startTime) * 1000) .. "ms",
+                "Target type: " .. self.inspectable[self.current.type]
+            },
+            1
         )
-        print("=============================================")
+    elseif (math.ceil((os.clock() - startTime) * 1000) >= 50) then
+        self:client_showNotification({
+                "Panel update took more time than usual",
+                "Update took: "
+                .. math.ceil((os.clock() - startTime) * 1000) .. "ms",
+                "Target type: " .. self.inspectable[self.current.type]
+            },
+            2
+        )
     end
 end
+
+--[[
+--- Displays a WAILA panel with steering information for when player is in a seat.
+---@param self WAILA
+---@param inter Interactable The seat interactable.
+function WAILA.client_displaySteeringPanel(self, inter)
+    if (not self.guis.STEERING_OUTLINED:isActive()) then
+        self.guis.STEERING_OUTLINED:open()
+    end
+
+    self.guis.STEERING_OUTLINED:setText("SpeedLabel",
+        string.format("%.0f", inter..velocity:length() * 2.6))
+end
+]]
 
 function WAILA.client_onThemeChanged(self, value)
     self.saved.settings.theme = self.guiThemes[string.upper(value)]
     self.network:sendToServer("server_saveData")
-    self:client_applyTheme(self.guiThemes[string.upper(value)])
+    self:client_applyTheme()
 end
 
 function WAILA.client_onHideBehaviourChanged(self, value)
@@ -1111,6 +1223,52 @@ function WAILA.client_cacheShapeRatings(self)
     print("[SM: WAILA] Caching completed in " .. math.floor((os.clock() - start) * 1000) .. "ms")
 end
 
+--- Gets the parent joint for the supplied shape, if any are present.
+---@param self WAILA
+---@param shape Shape
+function WAILA.client_findParentJoint(self, shape)
+    ---@type table<Joint, Joint>
+    local joints = shape:getJoints(false, false)
+
+    if (joints) then
+        ---@param joint Joint
+        for _, joint in pairs(joints) do
+            if (joint:getShapeB() == shape) then
+                return joint
+            end
+        end
+    else
+        return nil
+    end
+end
+
+--- Returns whether the supplied interactable can receive a logic signal.
+---@param self WAILA
+---@param inter any
+---@return boolean
+function WAILA.client_getInteractablePowerable(self, inter)
+    local powerable = { 1, 2, 16 }
+    return powerable[inter:getConnectionInputType()] ~= nil or inter:getConnectionInputType() > 1
+end
+
+--- Shows a notification in the debug console.
+---@param msg table<string> The lines to display.
+---@param type number The type of the notification. Types are: `1` - `info` (default), `2` - `warning`, `3` - `error`.
+function WAILA.client_showNotification(self, msg, type)
+    if (type == nil or type > 3) then type = 1 end
+    if (type == 1) then
+        print("=[SM: WAILA NOTIFICATION]====================")
+    elseif (type == 2) then
+        print("=[SM: WAILA WARNING]=========================")
+    elseif (type == 3) then
+        print("=[SM: WAILA ERROR]===========================")
+    end
+    for _, line in pairs(msg) do
+        print(line)
+    end
+    print("=============================================")
+end
+
 -- #endregion Utility
 
 
@@ -1118,7 +1276,7 @@ end
 --! Server side
 -- #region Server
 
-function WAILA.server_onChatCommand(self, params)
+function WAILA.server_onRequestConfigurationCommand(self, params)
     self.network:sendToClient(params.player, "client_openConfiguration", {})
 end
 

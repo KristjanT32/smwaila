@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<MyGUI type="Layout" version="3.2.0">
+    <Widget type="Widget" skin="DropDownBackground" position_real="0.33072916666666669 0.019444444444444445 0.33854166666666669 0.082407407407407401" name="MainPanel">
+        <Property key="Colour" value="1 1 1"/>
+        <Widget type="ItemBox" skin="InteractionBindingBackground" position_real="0.23846153846153847 0.11235955056179775 0.52307692307692311 0.7191011235955056" align="Center" name="ObjectPreviewBG">
+            <Property key="Colour" value="0.116959 0.116959 0.116959"/>
+        </Widget>
+        <Widget type="TextBox" skin="TextBox" position="155 15 340 40" name="SpeedLabel">
+            <Property key="Caption" value="000"/>
+            <Property key="FontName" value="SM_Digital"/>
+            <Property key="TextAlign" value="Center"/>
+            <Property key="FontHeight" value="25"/>
+        </Widget>
+        <Widget type="TextBox" skin="TextBox" position="155 50 340 20">
+            <Property key="Caption" value="km/h"/>
+            <Property key="TextAlign" value="Center"/>
+            <Property key="FontName" value="SM_Button"/>
+            <Property key="FontHeight" value="15"/>
+        </Widget>
+    </Widget>
+    <CodeGeneratorSettings/>
+</MyGUI>
