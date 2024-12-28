@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <MyGUI type="Layout" version="3.2.0">
-    <Widget type="Widget" skin="HudBackgroundLarge" position_real="0.33072916666666669 0.019444444444444445 0.33854166666666669 0.11944444444444445" name="MainPanel">
+    <Widget type="Widget" skin="HudBackgroundLarge" position_real="0.33072916666666669 0.018518518518518517 0.33854166666666669 0.11944444444444445" name="MainPanel">
         <Property key="Colour" value="1 1 1"/>
         <Widget type="ItemBox" skin="InteractionBindingBackground" position_real="0.023076923076923078 0.077519379844961239 0.16923076923076924 0.8527131782945736" name="ObjectPreviewBG">
             <Property key="Colour" value="0.116959 0.116959 0.116959"/>
@@ -43,6 +43,18 @@
                 <Property key="FontHeight" value="18"/>
             </Widget>
         </Widget>
+        <Widget type="Widget" skin="gui_keybinds_bg_orange" position_real="0.7615384615384615 0.62015503875968991 0.2076923076923077 0.27131782945736432" name="ModName">
+            <Property key="Colour" value="1 1 1"/>
+            <Widget type="TextBox" skin="TextBox" position_real="0.037037037037037035 0.14285714285714285 0.92592592592592593 0.7142857142857143" name="ModNameLabel">
+                <Property key="FontName" value="SM_TextSmall"/>
+                <Property key="TextAlign" value="Center"/>
+                <Property key="TextColour" value="0 0 0"/>
+                <Property key="FontHeight" value="15"/>
+                <Property key="Caption" value="Mod name here ..."/>
+                <Property key="WordWrap" value="true"/>
+                <Property key="ReadOnly" value="true"/>
+            </Widget>
+        </Widget>
     </Widget>
     <Widget type="Widget" skin="InteractionBindingBackground" position_real="0.58854166666666663 0.037037037037037035 0.0703125 0.023148148148148147" name="TypeLabelBG">
         <Widget type="TextBox" skin="TextBox" position_real="-0.037037037037037035 -0.20000000000000001 1.0740740740740742 1.3999999999999999" name="TypeLabel">
@@ -53,7 +65,7 @@
         </Widget>
     </Widget>
     <Widget type="Widget" skin="HudBackgroundLarge" position_real="0.33072916666666669 0.14351851851851852 0.33854166666666669 0.032407407407407406" name="ObjectStatsPanel">
-        <Widget type="TextBox" skin="TextBox" position_real="0.015384615384615385 0 0.96923076923076923 0.8571428571428571" name="ObjectStats">
+        <Widget type="TextBox" skin="TextBox" position_real="0.015384615384615385 0.085714285714285715 0.96923076923076923 0.8571428571428571" name="ObjectStats">
             <Property key="TextAlign" value="Center"/>
             <Property key="FontName" value="SM_LabelSmall"/>
         </Widget>

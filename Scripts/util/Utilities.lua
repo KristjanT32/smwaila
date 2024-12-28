@@ -90,3 +90,7 @@ function string.capitalize(str)
     local capitalized = str:lower()
     return string.sub(capitalized, 1, 1):upper() .. string.sub(capitalized, 2, capitalized:len())
 end
+
+function clockTimeToMillis(number)
+    return math.ceil(number * 1000)
+end

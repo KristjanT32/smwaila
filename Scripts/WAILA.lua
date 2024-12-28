@@ -2,6 +2,7 @@
 WAILA = class(nil)
 WAILA.instance = nil
 
+dofile("$CONTENT_DATA/Scripts/util/ModDBUtil.lua")
 dofile("$CONTENT_DATA/Scripts/util/Utilities.lua")
 dofile("$CONTENT_DATA/Scripts/util/Globals.lua")
 
@@ -24,8 +25,7 @@ WAILA.guis = {
 WAILA.gui = WAILA.guis.OVERLAY_TRANSPARENT
 
 
--- TODO: Try to come up with a way to prevent SMWAILA from covering other GUIs.
--- TODO: Work on creating the configuration panel
+-- !FIX: WAILA panel covers up other GUIs
 
 --? Types
 -- #region Types
@@ -229,6 +229,7 @@ function WAILA.client_onCreate(self)
     print("[SM: WAILA] Client side initialization")
     self:client_initializeGUI()
     self:client_cacheShapeRatings()
+    ModDBUtil:init()
 end
 
 function WAILA.server_onCreate(self)
@@ -437,6 +438,7 @@ function WAILA.client_resetPanel(self)
     self:client_clearPreview()
     self:client_hideInteractableStateFlair()
     self:client_hideLongColorFlair()
+    self:client_hideModNameLabel()
 end
 
 function WAILA.client_clearPreview(self)
@@ -454,6 +456,10 @@ end
 
 function WAILA.client_hideShortColorFlair(self)
     self.gui:setVisible("ObjectColor", false)
+end
+
+function WAILA.client_hideModNameLabel(self)
+    self.gui:setVisible("ModName", false)
 end
 
 function WAILA.client_showShortColorFlair(self)
@@ -534,6 +540,20 @@ function WAILA.client_setPropertiesLabel(self, properties)
     self.gui:setText("ObjectSubtitle", properties)
 end
 
+function WAILA.client_setModNameLabel(self, name)
+    self.gui:setVisible("ModName", true)
+
+    local out = ""
+    if (#name > 19) then
+        out = string.sub(name, 1, 16) .. "..."
+    else
+        out = name
+    end
+
+
+    self.gui:setText("ModNameLabel", out)
+end
+
 --- Updates the stats label to reflect the currently targeted shape's properties.
 ---@param self WAILA
 ---@param shape Shape the shape whose stats to display
@@ -549,6 +569,31 @@ function WAILA.client_setShapeStats(self, shape)
     local str = "#ffffffBuoyancy: #FCC200" .. string.format("%.1f", shape:getBuoyancy())
         .. "   "
         .. "#ffffffDurability: #FCC200" .. string.format("%.1f", sm.item.getQualityLevel(shape.uuid))
+
+    if (ratings ~= nil) then
+        str = str .. "   "
+            .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction or 0)
+            .. "   "
+            .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
+    end
+
+    self.gui:setText("ObjectStats", str)
+end
+
+--- Updates the stats label to reflect the specified ratings.
+---@param self WAILA
+---@param ratings table
+function WAILA.client_setShapeStatsFromTable(self, ratings)
+    if (not self.saved.settings.showRatings) then
+        self.gui:setVisible("ObjectStatsPanel", false)
+        return
+    end
+
+    self.gui:setVisible("ObjectStatsPanel", true)
+
+    local str = "#ffffffBuoyancy: #FCC200" .. string.format("%.1f", ratings.buoyancy)
+        .. "   "
+        .. "#ffffffDurability: #FCC200" .. string.format("%.1f", ratings.durability)
 
     if (ratings ~= nil) then
         str = str .. "   "
@@ -641,7 +686,16 @@ function WAILA.client_displayPanel(self, raycastResult)
 
     self:client_setTypeLabel(hitType)
     if (asShape ~= nil) then
-        self:client_setShapeStats(asShape)
+        if (ModDBUtil:isModded(self.cachedRatings, asShape.uuid)) then
+            if (ModDBUtil.cachedQueries[asShape.uuid] ~= nil) then
+                self:client_setShapeStatsFromTable(ModDBUtil.cachedQueries[asShape.uuid])
+            else
+                local _ratings = ModDBUtil:getShapeRatings(asShape)
+                self:client_setShapeStatsFromTable(_ratings)
+            end
+        else
+            self:client_setShapeStats(asShape)
+        end
     elseif (asJoint ~= nil) then
         self:client_setShapeStatsByUUID(asJoint.uuid)
     else
@@ -650,6 +704,10 @@ function WAILA.client_displayPanel(self, raycastResult)
 
     if (hitType == self.inspectable.SHAPE) then
         self.current.target = asShape
+
+        if (ModDBUtil:isModded(self.cachedRatings, asShape.uuid)) then
+            self:client_setModNameLabel(ModDBUtil:getModInfo(asShape.uuid).modName)
+        end
 
         self:client_setColor(asShape.color)
         self:client_setFlairMode(1)
@@ -731,6 +789,10 @@ function WAILA.client_displayPanel(self, raycastResult)
         self:client_setPreview(asInter:getShape().uuid)
         self.current.target = asInter
 
+        if (ModDBUtil:isModded(self.cachedRatings, asShape.uuid)) then
+            self:client_setModNameLabel(ModDBUtil:getModInfo(asShape.uuid).modName)
+        end
+
         if (type == self.interactableType.LOGIC_GATE) then
             local mode = self:client_getLogicGateTypeByUVIndex(asInter)
             self:client_setPropertiesLabel(
@@ -741,8 +803,8 @@ function WAILA.client_displayPanel(self, raycastResult)
 
 
             self:client_setInteractableState(asInter.active)
-            self.gui:setText("ObjectTitle",
-                sm.shape.getShapeTitle(asInter:getShape().uuid) .. " #ffffff(" .. mode .. "#ffffff)")
+            self:client_setTitleLabel(sm.shape.getShapeTitle(asInter:getShape().uuid) ..
+                " #ffffff(" .. mode .. "#ffffff)")
             self:client_setColor(asInter.shape.color)
         elseif (type == self.interactableType.SWITCH) then
             self:client_setInteractableState(asInter.active)
@@ -892,6 +954,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         self:client_setPropertiesLabel(sm.shape.getShapeDescription(shape.uuid))
         self:client_setPreview(shape.uuid)
         self:client_setColor(asShape.color)
+        self:client_setFlairMode(1)
     elseif (hitType == self.inspectable.PISTON) then
         self:client_setTitleLabel(sm.shape.getShapeTitle(asJoint:getShapeUuid()))
         self:client_setPreview(asJoint:getShapeUuid())
@@ -1168,7 +1231,7 @@ function WAILA.client_getInteractableType(self, interactable)
             .interactableType.CONTROLLER
     end
     if (interactable:getType() == "timer") then return self.interactableType.TIMER end
-    if (interactable:getType() == "scripted" or interactable:getType() == "simpleInteractive") then
+    if (interactable:getType() == "scripted" or interactable:getType() == "simpleInteractive" or interactable:getType() == "steering") then
         if (interactable:hasSeat()) then
             return self.interactableType.SEAT
         else
@@ -1192,6 +1255,10 @@ function WAILA.client_getInteractableType(self, interactable)
     return self.interactableType.UNKNOWN
 end
 
+--- Returns a table of shape ratings.
+---@param self WAILA
+---@param uuid Uuid
+---@return table
 function WAILA.client_getShapeRatings(self, uuid)
     if (self.cachedRatings == {}) then
         self:client_cacheShapeRatings()
