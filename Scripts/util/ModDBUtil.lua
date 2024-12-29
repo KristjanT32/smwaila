@@ -6,24 +6,37 @@ ModDBUtil = class(nil)
 ---@type boolean Whether the databases have been loaded.
 ModDBUtil.loaded = false
 
----@type table<string, table> Stores cached results for mod info queries mapped to the string UUIDs of the shapes.
-ModDBUtil.cachedQueries = {}
+---@type table<string, table> Stores cached shape info mapped to their UUID strings.
+ModDBUtil.cachedShapeInfo = {}
 
----@type table<string, table> Stores cached shape ratings mapped to their UUID strings.
-ModDBUtil.cachedRatings = {}
-
+---@type table<string, table>
+ModDBUtil.cachedShapesets = {}
 
 function ModDBUtil.init(self)
     local start = os.clock()
-    print("Loading ModDB databases...")
+    log("Loading ModDB databases...")
+    log("=================================================")
     ModDatabase.loadDescriptions()
     ModDatabase.loadShapesets()
-    ModDatabase.loadToolsets()
     ModDatabase.loadHarvestablesets()
-    ModDatabase.loadKinematicsets()
     ModDatabase.loadCharactersets()
-    ModDatabase.loadScriptableobjectsets()
-    print("Database loading finished in " .. clockTimeToMillis(os.clock() - start) .. "ms")
+    log("Database loading finished in " .. clockTimeToMillis(os.clock() - start) .. "ms")
+    log("=================================================")
+    log("Proceeding to cache shapesets...")
+    log("=================================================")
+    start = os.clock()
+    for _, modLocalId in pairs(ModDatabase.getAllLoadedMods()) do
+        if ModDatabase.databases.shapesets[modLocalId] == nil then goto skip end
+        for shapeset, shapes in pairs(ModDatabase.databases.shapesets[modLocalId]) do
+            self.cachedShapesets[shapeset] = {
+                modName = ModDatabase.databases.descriptions[modLocalId].name,
+                shapes = shapes
+            }
+        end
+        ::skip::
+    end
+    log("Shapeset caching finished in " .. clockTimeToMillis(os.clock() - start) .. "ms")
+    log("=================================================")
     self.loaded = true
 end
 
@@ -50,104 +63,112 @@ function ModDBUtil.getModNameByLocalId(self, localId)
     return ModDatabase.databases.descriptions[localId].name
 end
 
---- Returns a table of information about the object with the supplied UUID.
---- Returns nil, if no such object could be found.
+--- Returns the mod name
 ---@param uuid Uuid The UUID of the object to look up.
-function ModDBUtil.getModInfo(self, uuid)
-    if (self.cachedQueries[tostring(uuid)] ~= nil) then
-        return self.cachedQueries[tostring(uuid)]
-    else
-        print("Current target not cached - searching database")
+---@return string
+function ModDBUtil.getModNameByShape(self, uuid)
+    if (self.cachedShapeInfo[tostring(uuid)] ~= nil) then
+        return self.cachedShapeInfo[tostring(uuid)].modName
     end
 
-    for _, modLocalId in pairs(ModDatabase.getAllLoadedMods()) do
-        if ModDatabase.databases.shapesets[modLocalId] == nil then goto skip end
-        for shapeset, shapes in pairs(ModDatabase.databases.shapesets[modLocalId]) do
-            for _, shapeUuid in pairs(shapes) do
-                if (sm.uuid.new(shapeUuid) == uuid) then
-                    local opened_shapeset = sm.json.open(shapeset)
-                    local ratings = {}
-                    if (opened_shapeset["blockList"] ~= nil) then
-                        for _, value in pairs(opened_shapeset["blockList"]) do
-                            if (value.uuid == uuid) then
-                                ratings = value.ratings
-                                break
-                            end
+    for shapeset, info in pairs(self.cachedShapesets) do
+        for _, _uuid in pairs(info.shapes) do
+            if (sm.uuid.new(_uuid) == uuid) then
+                local opened_shapeset = sm.json.open(shapeset)
+                local ratings = {}
+                if (hasBlockList(opened_shapeset)) then
+                    for _, value in pairs(opened_shapeset["blockList"]) do
+                        if (value.uuid == uuid) then
+                            ratings = value.ratings
+                            break
                         end
                     end
-
-                    self.cachedQueries[tostring(uuid)] = {
-                        modName = self:getModNameByLocalId(modLocalId),
-                        ratings = ratings
-                    }
-                    return {
-                        modName = self:getModNameByLocalId(modLocalId),
-                        ratings = ratings
-                    }
                 end
+                if (hasPartList(opened_shapeset)) then
+                    for _, value in pairs(opened_shapeset["partList"]) do
+                        if (value.uuid == uuid) then
+                            ratings = value.ratings
+                            break
+                        end
+                    end
+                end
+
+                self.cachedShapeInfo[tostring(uuid)] = {
+                    modName = info.modName,
+                    ratings = ratings
+                }
+                return info.modName;
             end
         end
-        ::skip::
     end
+    return "Unknown"
 end
 
 --- Gets the ratings for the supplied shape.
+--- This will either return the full ratings table (if available),
+--- or a shorter version with durability, buoyancy and a material name.
+---
+--- Full table `{durability, density, friction, buoyancy}`
+--- <br>
+--- Short table `{durability, buoyancy, material, modName}`
 ---@param self ModDBUtil
 ---@param shape Shape The shape to look up ratings for
 ---@return table The ratings table.
 function ModDBUtil.getShapeRatings(self, shape)
-    if (self.cachedRatings[tostring(shape.uuid)] ~= nil) then
-        if (self.cachedRatings[tostring(shape.uuid)]["ratings"] ~= nil) then
-            return self.cachedRatings[tostring(shape.uuid)].ratings
-        end
-    end
     local uuid = shape.uuid
-    for _, modLocalId in pairs(ModDatabase.getAllLoadedMods()) do
-        if ModDatabase.databases.shapesets[modLocalId] == nil then goto skip end
-        for shapeset, shapes in pairs(ModDatabase.databases.shapesets[modLocalId]) do
-            for _, shapeUuid in pairs(shapes) do
-                if (sm.uuid.new(shapeUuid) == uuid) then
-                    local _shapeset = sm.json.open(shapeset)
 
-                    if (hasBlockList(_shapeset)) then
-                        for _, entry in pairs(_shapeset["blockList"]) do
-                            if (entry.uuid == tostring(uuid)) then
-                                if (entry.ratings ~= nil) then
-                                    self.cachedRatings[tostring(uuid)] = {
-                                        modName = self:getModNameByLocalId(modLocalId),
-                                        ratings = entry.ratings
-                                    }
-                                    return entry.ratings
-                                end
+    -- Check for cached shape info first
+    if (self.cachedShapeInfo[tostring(shape.uuid)] ~= nil) then
+        return self.cachedShapeInfo[tostring(shape.uuid)].ratings
+    end
+
+    local originModName = ""
+
+    for shapeset, info in pairs(self.cachedShapesets) do
+        for _, _uuid in pairs(info.shapes) do
+            if (sm.uuid.new(_uuid) == uuid) then
+                originModName = info.modName
+                local _shapeset = sm.json.open(shapeset)
+                if (hasBlockList(_shapeset)) then
+                    for _, entry in pairs(_shapeset["blockList"]) do
+                        if (entry.uuid == tostring(uuid)) then
+                            if (entry.ratings ~= nil) then
+                                self.cachedShapeInfo[tostring(uuid)] = {
+                                    modName = info.modName,
+                                    ratings = entry.ratings
+                                }
+                                return entry.ratings
                             end
                         end
                     end
+                end
 
-                    if (hasPartList(_shapeset)) then
-                        for _, entry in pairs(_shapeset["partList"]) do
-                            if (entry.uuid == tostring(uuid)) then
-                                if (entry.ratings ~= nil) then
-                                    self.cachedRatings[tostring(uuid)] = {
-                                        modName = self:getModNameByLocalId(modLocalId),
-                                        ratings = entry.ratings
-                                    }
-                                    return entry.ratings
-                                end
+                if (hasPartList(_shapeset)) then
+                    for _, entry in pairs(_shapeset["partList"]) do
+                        if (entry.uuid == tostring(uuid)) then
+                            if (entry.ratings ~= nil) then
+                                self.cachedShapeInfo[tostring(uuid)] = {
+                                    modName = info.modName,
+                                    ratings = entry.ratings
+                                }
+                                return entry.ratings
                             end
                         end
                     end
                 end
             end
         end
-        ::skip::
     end
-    if (self.cachedRatings[tostring(uuid)] == nil) then
-        print("Couldn't find ratings for " ..
-            tostring(uuid) .. ". Returning all available vanilla ratings.")
-        self.cachedRatings[tostring(uuid)] = {
-            buoyancy = shape:getBuoyancy(),
-            durability = sm.item.getQualityLevel(uuid)
+
+    if (self.cachedShapeInfo[tostring(uuid)] == nil) then
+        self.cachedShapeInfo[tostring(uuid)] = {
+            modName = originModName,
+            ratings = {
+                buoyancy = shape:getBuoyancy(),
+                durability = sm.item.getQualityLevel(uuid),
+                material = shape.material
+            }
         }
     end
-    return self.cachedRatings[tostring(uuid)]
+    return self.cachedShapeInfo[tostring(uuid)].ratings
 end

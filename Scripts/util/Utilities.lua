@@ -94,3 +94,12 @@ end
 function clockTimeToMillis(number)
     return math.ceil(number * 1000)
 end
+
+function log(msg, isError)
+    if (isError == nil) then isError = false end
+    if (not isError) then
+        print("[SMWAILA/INFO]: " .. msg)
+    else
+        print("[SMWAILA/ERROR]: " .. msg)
+    end
+end

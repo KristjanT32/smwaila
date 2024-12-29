@@ -226,14 +226,14 @@ local commandsBound = false
 
 
 function WAILA.client_onCreate(self)
-    print("[SM: WAILA] Client side initialization")
+    log("Client side initialization")
     self:client_initializeGUI()
     self:client_cacheShapeRatings()
     ModDBUtil:init()
 end
 
 function WAILA.server_onCreate(self)
-    print("[SM: WAILA] Server side initialization")
+    log("Server side initialization")
     self:server_initializeStorage()
     if not WAILA.instance or WAILA.instance ~= self then
         WAILA.instance = self
@@ -570,11 +570,13 @@ function WAILA.client_setShapeStats(self, shape)
         .. "   "
         .. "#ffffffDurability: #FCC200" .. string.format("%.1f", sm.item.getQualityLevel(shape.uuid))
 
-    if (ratings ~= nil) then
+    if (ratings ~= nil and sizeof(ratings) == 4) then
         str = str .. "   "
-            .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction or 0)
+            .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction)
             .. "   "
-            .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
+            .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density)
+    else
+        str = str .. "   " .. "Material: " .. string.capitalize(shape.material)
     end
 
     self.gui:setText("ObjectStats", str)
@@ -595,11 +597,13 @@ function WAILA.client_setShapeStatsFromTable(self, ratings)
         .. "   "
         .. "#ffffffDurability: #FCC200" .. string.format("%.1f", ratings.durability)
 
-    if (ratings ~= nil) then
+    if (ratings.friction ~= nil and ratings.density ~= nil) then
         str = str .. "   "
             .. "#ffffffFriction: #FCC200" .. string.format("%.1f", ratings.friction or 0)
             .. "   "
             .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
+    else
+        str = str .. "   " .. "#ffffffMaterial: #FCC200" .. ratings.material
     end
 
     self.gui:setText("ObjectStats", str)
@@ -687,12 +691,9 @@ function WAILA.client_displayPanel(self, raycastResult)
     self:client_setTypeLabel(hitType)
     if (asShape ~= nil) then
         if (ModDBUtil:isModded(self.cachedRatings, asShape.uuid)) then
-            if (ModDBUtil.cachedQueries[asShape.uuid] ~= nil) then
-                self:client_setShapeStatsFromTable(ModDBUtil.cachedQueries[asShape.uuid])
-            else
-                local _ratings = ModDBUtil:getShapeRatings(asShape)
-                self:client_setShapeStatsFromTable(_ratings)
-            end
+            local _ratings = ModDBUtil:getShapeRatings(asShape)
+
+            self:client_setShapeStatsFromTable(_ratings)
         else
             self:client_setShapeStats(asShape)
         end
@@ -706,7 +707,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         self.current.target = asShape
 
         if (ModDBUtil:isModded(self.cachedRatings, asShape.uuid)) then
-            self:client_setModNameLabel(ModDBUtil:getModInfo(asShape.uuid).modName)
+            self:client_setModNameLabel(ModDBUtil:getModNameByShape(asShape.uuid))
         end
 
         self:client_setColor(asShape.color)
@@ -790,7 +791,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         self.current.target = asInter
 
         if (ModDBUtil:isModded(self.cachedRatings, asShape.uuid)) then
-            self:client_setModNameLabel(ModDBUtil:getModInfo(asShape.uuid).modName)
+            self:client_setModNameLabel(ModDBUtil:getModNameByShape(asShape.uuid))
         end
 
         if (type == self.interactableType.LOGIC_GATE) then
@@ -1271,7 +1272,7 @@ end
 function WAILA.client_cacheShapeRatings(self)
     self.cachedRatings = {}
     local start = os.clock()
-    print("[SM: WAILA] Caching shape ratings...")
+    log("Caching shape ratings...")
 
     local shapesets = sm.json.open("$GAME_DATA/Objects/Database/shapesets.json")
     for _, shapeset in pairs(shapesets.shapeSetList) do
@@ -1287,7 +1288,7 @@ function WAILA.client_cacheShapeRatings(self)
             end
         end
     end
-    print("[SM: WAILA] Caching completed in " .. math.floor((os.clock() - start) * 1000) .. "ms")
+    log("Caching completed in " .. math.floor((os.clock() - start) * 1000) .. "ms")
 end
 
 --- Gets the parent joint for the supplied shape, if any are present.
@@ -1324,16 +1325,16 @@ end
 function WAILA.client_showNotification(self, msg, type)
     if (type == nil or type > 3) then type = 1 end
     if (type == 1) then
-        print("=[SM: WAILA NOTIFICATION]====================")
+        log("=[SM: WAILA NOTIFICATION]====================")
     elseif (type == 2) then
-        print("=[SM: WAILA WARNING]=========================")
+        log("=[SM: WAILA WARNING]=========================")
     elseif (type == 3) then
-        print("=[SM: WAILA ERROR]===========================")
+        log("=[SM: WAILA ERROR]===========================")
     end
     for _, line in pairs(msg) do
-        print(line)
+        log(line)
     end
-    print("=============================================")
+    log("=============================================")
 end
 
 -- #endregion Utility
