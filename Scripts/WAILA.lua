@@ -1063,7 +1063,7 @@ function WAILA.client_displayPanel(self, raycastResult)
     self.gui:open()
 
 
-    if (math.ceil((os.clock() - startTime) * 1000) >= 10) then
+    if (math.ceil((os.clock() - startTime) * 1000) >= 25 and math.ceil((os.clock() - startTime) * 1000) < 50) then
         self:client_showNotification({
                 "Panel update took more time than usual",
                 "Update took: "
