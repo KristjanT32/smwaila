@@ -48,15 +48,6 @@ local function hasPartList(shapeset)
     return shapeset["partList"] ~= nil
 end
 
---- Checks if the supplied UUID is in the `cachedRatings` table.
---- If it is not, the shape must be modded.
---- If it is, it is vanilla.
----@param self ModDBUtil
----@param cachedRatings table<string, table>
----@param uuid Uuid
-function ModDBUtil.isModded(self, cachedRatings, uuid)
-    return not containsKey(cachedRatings, tostring(uuid))
-end
 
 function ModDBUtil.getModNameByLocalId(self, localId)
     if (not self.loaded) then self:init() end

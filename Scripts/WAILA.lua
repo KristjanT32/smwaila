@@ -200,8 +200,11 @@ WAILA.current = {
     --- @type string
     type = nil,
 
-    --- @type integer
-    lastUpdate = 0
+    --- @type integer The amount of ticks elapsed after the last panel update.
+    lastUpdate = 0,
+
+    ---@type integer The amount of ticks elapsed after the last time the mouse moved.
+    lastMouseMove = 0
 }
 
 WAILA.saved = {}
@@ -223,6 +226,9 @@ WAILA.enabled = true
 
 -- Makes sure that the commands are only registered once in the hook.
 local commandsBound = false
+local TICKS_PER_SECOND = 40
+
+local WAILA_TIMEOUT_DURATION = 5;
 
 
 function WAILA.client_onCreate(self)
@@ -287,6 +293,15 @@ sm.event.sendToWorld = worldEventHook
 -- #region Client
 
 function WAILA.client_onFixedUpdate(self, deltaTime)
+    if (sm.localPlayer.getMouseDelta() ~= 0) then
+        self.current.lastMouseMove = 0
+    end
+
+    if (sm.localPlayer.getMouseDelta() == 0) then
+        self.current.lastMouseMove = self.current.lastMouseMove + 1
+    end
+
+
     if (not self.enabled) then
         if (self.gui:isActive()) then
             self:client_closePanel()
@@ -354,6 +369,9 @@ function WAILA.client_initializeGUI(self)
             "No"
         }
     )
+
+    self.guis.CONFIGURATION:setSliderCallback("TimeoutSlider", "client_onPanelTimeoutChanged")
+    self:client_onPanelTimeoutChanged("", self.saved.settings.panelTimeout)
 
     self.guis.CONFIGURATION:setButtonCallback("SMWAILAToggle", "client_toggleSMWAILA")
     self:client_applyTheme()
@@ -541,6 +559,10 @@ function WAILA.client_setPropertiesLabel(self, properties)
 end
 
 function WAILA.client_setModNameLabel(self, name)
+    if (#name == 0) then
+        self.gui:setVisible("ModName", false)
+        return
+    end
     self.gui:setVisible("ModName", true)
 
     local out = ""
@@ -603,7 +625,7 @@ function WAILA.client_setShapeStatsFromTable(self, ratings)
             .. "   "
             .. "#ffffffDensity (weight): #FCC200" .. string.format("%.1f", ratings.density or 1)
     else
-        str = str .. "   " .. "#ffffffMaterial: #FCC200" .. ratings.material
+        str = str .. "   " .. "#ffffffMaterial: #FCC200" .. string.capitalize(ratings.material)
     end
 
     self.gui:setText("ObjectStats", str)
@@ -651,7 +673,16 @@ function WAILA.client_displayPanel(self, raycastResult)
         end
         ]]
     end
-    self.current.lastUpdate = 0
+
+    if (self.saved.settings.panelTimeout ~= 0) then
+        if (self.current.lastMouseMove >= self.saved.settings.panelTimeout * TICKS_PER_SECOND) then
+            if (self.gui:isActive()) then
+                self.gui:close()
+            end
+            return
+        end
+    end
+
     local startTime = os.clock()
 
     if (self.gui:isActive()) then
@@ -690,7 +721,7 @@ function WAILA.client_displayPanel(self, raycastResult)
 
     self:client_setTypeLabel(hitType)
     if (asShape ~= nil) then
-        if (ModDBUtil:isModded(self.cachedRatings, asShape.uuid)) then
+        if (self:client_isModdedShape(asShape.uuid)) then
             local _ratings = ModDBUtil:getShapeRatings(asShape)
 
             self:client_setShapeStatsFromTable(_ratings)
@@ -706,7 +737,7 @@ function WAILA.client_displayPanel(self, raycastResult)
     if (hitType == self.inspectable.SHAPE) then
         self.current.target = asShape
 
-        if (ModDBUtil:isModded(self.cachedRatings, asShape.uuid)) then
+        if (self:client_isModdedShape(asShape.uuid)) then
             self:client_setModNameLabel(ModDBUtil:getModNameByShape(asShape.uuid))
         end
 
@@ -790,7 +821,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         self:client_setPreview(asInter:getShape().uuid)
         self.current.target = asInter
 
-        if (ModDBUtil:isModded(self.cachedRatings, asShape.uuid)) then
+        if (self:client_isModdedShape(asShape.uuid)) then
             self:client_setModNameLabel(ModDBUtil:getModNameByShape(asShape.uuid))
         end
 
@@ -1122,6 +1153,16 @@ function WAILA.client_onRatingsBehaviourChanged(self, value)
     self.network:sendToServer("server_saveData")
 end
 
+function WAILA.client_onPanelTimeoutChanged(self, sliderName, value)
+    if (value == 0) then
+        self.guis.CONFIGURATION:setText("TimeoutLabel", "#ff0000[Disabled]")
+    else
+        self.guis.CONFIGURATION:setText("TimeoutLabel", "#ffffff" .. tostring(value) .. "#ffff00s")
+    end
+    self.saved.settings.panelTimeout = value
+    self.network:sendToServer("server_saveData")
+end
+
 function WAILA.client_toggleSMWAILA(self)
     self.enabled = not self.enabled
     self.saved.enabled = self.enabled
@@ -1145,7 +1186,6 @@ function WAILA.client_applyTheme(self)
 end
 
 -- #endregion GUI
-
 
 
 --! Utils
@@ -1310,6 +1350,14 @@ function WAILA.client_findParentJoint(self, shape)
     end
 end
 
+--- Checks if the supplied UUID is in the `cachedRatings` table.
+--- If it is not, the shape must be modded.
+--- If it is, it is vanilla.
+---@param uuid Uuid
+function WAILA.client_isModdedShape(self, shapeUUID)
+    return self.cachedRatings[tostring(shapeUUID)] == nil
+end
+
 --- Returns whether the supplied interactable can receive a logic signal.
 ---@param self WAILA
 ---@param inter any
@@ -1354,9 +1402,27 @@ function WAILA.server_initializeStorage(self)
             theme = self.guiThemes.OUTLINED,
             hideInSeat = false,
             showRatings = true,
-            enabled = true
+            enabled = true,
+            panelTimeout = 0
         }
     }
+    -- Initialize any missing fields if any were added in an update and might be missing in the saved settings.
+    if (self.saved.settings.theme == nil) then
+        self.saved.settings.theme = self.guiThemes.OUTLINED
+    end
+    if (self.saved.settings.hideInSeat == nil) then
+        self.saved.settings.hideInSeat = false
+    end
+    if (self.saved.settings.showRatings == nil) then
+        self.saved.settings.showRatings = true
+    end
+    if (self.saved.settings.enabled == nil) then
+        self.saved.settings.enabled = true
+    end
+    if (self.saved.settings.panelTimeout == nil) then
+        self.saved.settings.panelTimeout = 0
+    end
+    log("Storage and settings initialized.")
 end
 
 function WAILA.server_saveData(self)
