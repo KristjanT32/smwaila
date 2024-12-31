@@ -411,6 +411,15 @@ function WAILA.client_setTypeLabel(self, type)
     end
 end
 
+function WAILA.client_setLogicModeLabel(self, value)
+    if (#value == 0) then
+        self.gui:setVisible("LogicMode", false)
+        return
+    end
+    self.gui:setVisible("LogicMode", true)
+    self.gui:setText("LogicModeLabel", string.upper(value))
+end
+
 function WAILA.client_openConfiguration(self)
     self.guis.CONFIGURATION:setSelectedDropDownItem(
         "ThemeSelector",
@@ -445,6 +454,7 @@ function WAILA.client_closePanel(self)
         self:client_setColor(sm.color.new("#ffffff"))
         self:client_clearPreview()
         self:client_hideInteractableStateFlair()
+        self:client_setLogicModeLabel("")
         self.gui:close()
     end
 end
@@ -457,6 +467,7 @@ function WAILA.client_resetPanel(self)
     self:client_hideInteractableStateFlair()
     self:client_hideLongColorFlair()
     self:client_hideModNameLabel()
+    self:client_setLogicModeLabel("")
 end
 
 function WAILA.client_clearPreview(self)
@@ -548,7 +559,13 @@ end
 ---@param self WAILA
 ---@param title string The title to set
 function WAILA.client_setTitleLabel(self, title)
-    self.gui:setText("ObjectTitle", title)
+    local out = title
+    if (#title > 43) then
+        out = title:sub(1, 40) .. "..."
+    end
+
+    local str, count = out:gsub("[\n\r]", " ")
+    self.gui:setText("ObjectTitle", str)
 end
 
 --- Sets the properties label to <code>properties</code>
@@ -835,8 +852,8 @@ function WAILA.client_displayPanel(self, raycastResult)
 
 
             self:client_setInteractableState(asInter.active)
-            self:client_setTitleLabel(sm.shape.getShapeTitle(asInter:getShape().uuid) ..
-                " #ffffff(" .. mode .. "#ffffff)")
+            self:client_setTitleLabel(sm.shape.getShapeTitle(asInter:getShape().uuid))
+            self:client_setLogicModeLabel(mode)
             self:client_setColor(asInter.shape.color)
         elseif (type == self.interactableType.SWITCH) then
             self:client_setInteractableState(asInter.active)

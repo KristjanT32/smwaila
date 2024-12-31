@@ -2,20 +2,26 @@
 <MyGUI type="Layout" version="3.2.0">
     <Widget type="Widget" skin="HudBackgroundLarge" position_real="0.33072916666666669 0.018518518518518517 0.33854166666666669 0.11944444444444445" name="MainPanel">
         <Property key="Colour" value="1 1 1"/>
-        <Widget type="ItemBox" skin="InteractionBindingBackground" position_real="0.023076923076923078 0.077519379844961239 0.16923076923076924 0.8527131782945736" name="ObjectPreviewBG">
+        <Widget type="ItemBox" skin="InteractionBindingBackground" position_real="0.015384615384615385 0.077519379844961239 0.16923076923076924 0.8527131782945736" name="ObjectPreviewBG">
             <Property key="Colour" value="0.116959 0.116959 0.116959"/>
+            <Widget type="ImageBox" skin="ImageBox" position_real="0.045454545454545456 0.054545454545454543 0.90000000000000002 0.89090909090909087" align="Center" name="ObjectPreview"/>
+            <Widget type="ImageBox" skin="ImageBox" position_real="0.045454545454545456 0.054545454545454543 0.90000000000000002 0.89090909090909087" align="Center" name="ObjectPreviewAlternative"/>
         </Widget>
-        <Widget type="TextBox" skin="TextBox" position_real="0.2153846153846154 0.11627906976744186 0.52307692307692311 0.27131782945736432" align="Left VCenter" name="ObjectTitle">
+        <Widget type="EditBox" skin="TextBox" position_real="0.2153846153846154 0.11627906976744186 0.52307692307692311 0.27131782945736432" align="Left VCenter" name="ObjectTitle">
             <Property key="FontName" value="SM_ItemTitle"/>
             <Property key="TextAlign" value="Left VCenter"/>
             <Property key="Caption" value="Item Title"/>
+            <Property key="WordWrap" value="true"/>
+            <Property key="MultiLine" value="true"/>
+            <Property key="ReadOnly" value="true"/>
         </Widget>
-        <Widget type="TextBox" skin="TextBox" position_real="0.2153846153846154 0.38759689922480622 0.52307692307692311 0.46511627906976744" align="Left Top" name="ObjectSubtitle">
+        <Widget type="EditBox" skin="TextBox" position_real="0.2153846153846154 0.38759689922480622 0.52307692307692311 0.50387596899224807" align="Left Top" name="ObjectSubtitle">
             <Property key="TextAlign" value="Left Top"/>
             <Property key="Caption" value="Item properties, description etc."/>
+            <Property key="WordWrap" value="true"/>
+            <Property key="ReadOnly" value="true"/>
+            <Property key="MultiLine" value="true"/>
         </Widget>
-        <Widget type="ImageBox" skin="ImageBox" position_real="0.030769230769230771 0.11627906976744186 0.15384615384615385 0.77519379844961245" align="Center" name="ObjectPreview"/>
-        <Widget type="ImageBox" skin="ImageBox" position_real="0.030769230769230771 0.11627906976744186 0.15384615384615385 0.77519379844961245" align="Center" name="ObjectPreviewAlternative"/>
         <Widget type="ImageBox" skin="InteractionBindingBackground" position_real="0.84615384615384615 0.38759689922480622 0.12307692307692308 0.19379844961240311" name="ObjectColor">
             <Property key="Colour" value="1 1 1"/>
             <Widget type="TextBox" skin="TextBox" position_real="0 0 1 1" name="ObjectColorCode">
@@ -62,6 +68,15 @@
             <Property key="TextAlign" value="Center"/>
             <Property key="TextColour" value="0 0 0"/>
             <Property key="Caption" value="ITEM TYPE"/>
+        </Widget>
+    </Widget>
+    <Widget type="ImageBox" skin="GenderButton" position_real="0.58854166666666663 0.097222222222222224 0.0703125 0.023148148148148147" name="LogicMode">
+        <Property key="Colour" value="1 1 1"/>
+        <Widget type="TextBox" skin="TextBox" position_real="0 0 1 1" name="LogicModeLabel">
+            <Property key="Caption" value="XNOR"/>
+            <Property key="FontName" value="SM_ButtonSmallBold"/>
+            <Property key="TextAlign" value="Center"/>
+            <Property key="TextColour" value="1 1 1"/>
         </Widget>
     </Widget>
     <Widget type="Widget" skin="HudBackgroundLarge" position_real="0.33072916666666669 0.14351851851851852 0.33854166666666669 0.032407407407407406" name="ObjectStatsPanel">

@@ -91,6 +91,14 @@ function string.capitalize(str)
     return string.sub(capitalized, 1, 1):upper() .. string.sub(capitalized, 2, capitalized:len())
 end
 
+function string.count(str, sequence)
+    local matches = 0
+    for k, v in str:gmatch(sequence) do
+        matches = matches + 1
+    end
+    return matches
+end
+
 function clockTimeToMillis(number)
     return math.ceil(number * 1000)
 end
