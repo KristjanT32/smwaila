@@ -65,7 +65,13 @@ function ModDBUtil.getModNameByShape(self, uuid)
     for shapeset, info in pairs(self.cachedShapesets) do
         for _, _uuid in pairs(info.shapes) do
             if (sm.uuid.new(_uuid) == uuid) then
-                local opened_shapeset = sm.json.open(shapeset)
+                local success, opened_shapeset = pcall(sm.json.open, shapeset)
+                if (not success) then
+                    log("Failed to open shapeset for " .. info.modName .. " -> " .. shapeset, true)
+                    log("Error: " .. tostring(opened_shapeset), true)
+                    return info.modName
+                end
+
                 local ratings = {}
                 if (hasBlockList(opened_shapeset)) then
                     for _, value in pairs(opened_shapeset["blockList"]) do
@@ -119,7 +125,14 @@ function ModDBUtil.getShapeRatings(self, shape)
         for _, _uuid in pairs(info.shapes) do
             if (sm.uuid.new(_uuid) == uuid) then
                 originModName = info.modName
-                local _shapeset = sm.json.open(shapeset)
+                local success, _shapeset = pcall(sm.json.open, shapeset)
+                if (not success) then
+                    log("Failed to open shapeset for " .. info.modName .. " -> " .. shapeset, true)
+                    log("Error: " .. tostring(opened_shapeset))
+                    goto skip_shapeset
+                end
+
+
                 if (hasBlockList(_shapeset)) then
                     for _, entry in pairs(_shapeset["blockList"]) do
                         if (entry.uuid == tostring(uuid)) then
@@ -149,6 +162,7 @@ function ModDBUtil.getShapeRatings(self, shape)
                 end
             end
         end
+        ::skip_shapeset::
     end
 
     if (self.cachedShapeInfo[tostring(uuid)] == nil) then

@@ -25,14 +25,17 @@ function sizeof(table)
 end
 
 function table.size(table)
+    if (table == nil) then return 0 end
     return sizeof(table)
 end
 
 function table.hasValue(table, value)
+    if (table == nil) then return false end
     return containsValue(table, value)
 end
 
 function table.hasKey(table, key)
+    if (table == nil) then return false end
     return containsKey(table, key)
 end
 
@@ -87,6 +90,9 @@ end
 ---@param str string The string to capitalize.
 ---@return string capitalized A capitalized string.
 function string.capitalize(str)
+    if (str == nil) then
+        return ""
+    end
     local capitalized = str:lower()
     return string.sub(capitalized, 1, 1):upper() .. string.sub(capitalized, 2, capitalized:len())
 end
