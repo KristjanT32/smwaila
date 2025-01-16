@@ -209,6 +209,14 @@ WAILA.current = {
 
 WAILA.saved = {}
 
+
+--? Figure out a good way to integrate Whatchamacallit into SMWAILA.
+
+---@type table Holds the states of all integrations
+WAILA.integrations = {
+    whatchamacallit = false
+}
+
 -- Vanilla objects' UUIDs mapped to their respective ratings tables. A ratings table is defined as follows:
 --[[```
 {
@@ -309,7 +317,7 @@ function WAILA.client_onFixedUpdate(self, deltaTime)
         return
     end
     --- @type RaycastResult
-    local successful, result = sm.localPlayer.getRaycast(10)
+    local successful, result = sm.localPlayer.getRaycast(7.5)
     if (successful) then
         if (not result.valid or result.type == "terrainSurface") then
             if (self:client_panelShown()) then
@@ -555,7 +563,7 @@ function WAILA.client_setCharacterIcon(self, character_icon_file)
     self.gui:setImage("ObjectPreviewAlternative", "$CONTENT_DATA/Gui/Assets/Characters/" .. character_icon_file)
 end
 
---- Sets the title label to <code>title</code>
+--- Sets the title label to `title`.
 ---@param self WAILA
 ---@param title string The title to set
 function WAILA.client_setTitleLabel(self, title)
@@ -700,6 +708,13 @@ function WAILA.client_displayPanel(self, raycastResult)
         end
     end
 
+    if (not self.integrations.whatchamacallit) then
+        if (sm.whatchamacallit) then
+            self.integrations.whatchamacallit = true
+            log("Whatchamacallit integration active!")
+        end
+    end
+
     local startTime = os.clock()
 
     if (self.gui:isActive()) then
@@ -793,7 +808,11 @@ function WAILA.client_displayPanel(self, raycastResult)
                 end
             end
 
-            self:client_setTitleLabel(sm.shape.getShapeTitle(asShape.uuid) .. " #FCC200x" .. blocks)
+            if (sm.whatchamacallit and sm.whatchamacallit.isNamed(asShape.uuid, asShape.id)) then
+                self:client_setTitleLabel(sm.whatchamacallit.getName(asShape.uuid, asShape.id))
+            else
+                self:client_setTitleLabel(sm.shape.getShapeTitle(asShape.uuid) .. " #FCC200x" .. blocks)
+            end
             local parentJoint = self:client_findParentJoint(asShape)
             if (parentJoint ~= nil and parentJoint.type == "bearing") then
                 if (math.abs(parentJoint:getAngularVelocity()) > 0) then
@@ -816,7 +835,11 @@ function WAILA.client_displayPanel(self, raycastResult)
             end
             self:client_setPreview(asShape.uuid)
         else
-            self:client_setTitleLabel(sm.shape.getShapeTitle(asShape.uuid))
+            if (sm.whatchamacallit and sm.whatchamacallit.isNamed(asShape.uuid, asShape.id)) then
+                self:client_setTitleLabel(sm.whatchamacallit.getName(asShape.uuid, asShape.id))
+            else
+                self:client_setTitleLabel(sm.shape.getShapeTitle(asShape.uuid))
+            end
             self:client_setPreview(asShape.uuid)
 
             ---@type Joint | nil
@@ -994,18 +1017,30 @@ function WAILA.client_displayPanel(self, raycastResult)
                 self:client_setFlairMode(1)
             end
         end
+        if (sm.whatchamacallit and sm.whatchamacallit.isNamed(asShape.uuid, asShape.id)) then
+            self:client_setTitleLabel(sm.whatchamacallit.getName(asShape.uuid, asShape.id))
+        end
         self:client_setColor(asInter.shape.color)
     elseif (hitType == self.inspectable.CONSUMABLE) then
         self.current.target = asShape
 
         local shape = raycastResult:getShape()
-        self:client_setTitleLabel(sm.shape.getShapeTitle(shape.uuid))
+        if (sm.whatchamacallit and sm.whatchamacallit.isNamed(asShape.uuid, asShape.id)) then
+            self:client_setTitleLabel(sm.whatchamacallit.getName(asShape.uuid, asShape.id))
+        else
+            self:client_setTitleLabel(sm.shape.getShapeTitle(shape.uuid))
+        end
+
         self:client_setPropertiesLabel(sm.shape.getShapeDescription(shape.uuid))
         self:client_setPreview(shape.uuid)
         self:client_setColor(asShape.color)
         self:client_setFlairMode(1)
     elseif (hitType == self.inspectable.PISTON) then
-        self:client_setTitleLabel(sm.shape.getShapeTitle(asJoint:getShapeUuid()))
+        if (sm.whatchamacallit and sm.whatchamacallit.isNamed(asJoint.uuid, asJoint.id)) then
+            self:client_setTitleLabel(sm.whatchamacallit.getName(asJoint.uuid, asJoint.id))
+        else
+            self:client_setTitleLabel(sm.shape.getShapeTitle(asJoint:getShapeUuid()))
+        end
         self:client_setPreview(asJoint:getShapeUuid())
         self:client_setFlairMode(2)
         self.current.target = asJoint
@@ -1048,10 +1083,18 @@ function WAILA.client_displayPanel(self, raycastResult)
             self:client_setTitleLabel(asChar:getPlayer().name)
         else
             if (table.hasKey(self.vanillaCharacters, tostring(asChar:getCharacterType()))) then
-                self:client_setTitleLabel(self.vanillaCharacters[tostring(asChar:getCharacterType())].name)
+                if (sm.whatchamacallit and sm.whatchamacallit.isNamed(asChar:getCharacterType(), asChar.id)) then
+                    self:client_setTitleLabel(sm.whatchamacallit.getName(asChar:getCharacterType(), asChar.id))
+                else
+                    self:client_setTitleLabel(self.vanillaCharacters[tostring(asChar:getCharacterType())].name)
+                end
                 self:client_setCharacterIcon(self.vanillaCharacters[tostring(asChar:getCharacterType())].icon)
             else
-                self:client_setTitleLabel("Character ##" .. asChar:getId())
+                if (sm.whatchamacallit and sm.whatchamacallit.isNamed(asChar:getCharacterType(), asChar.id)) then
+                    self:client_setTitleLabel(sm.whatchamacallit.getName(asChar:getCharacterType(), asChar.id))
+                else
+                    self:client_setTitleLabel("Character ##" .. asChar:getId())
+                end
             end
 
             local activeAnimations = ""
@@ -1073,7 +1116,12 @@ function WAILA.client_displayPanel(self, raycastResult)
         self:client_setFlairMode(1)
         local asHarvest = raycastResult:getHarvestable()
         self.current.target = asHarvest
-        self:client_setTitleLabel(self.vanillaHarvestables[tostring(asHarvest.uuid)].name)
+
+        if (sm.whatchamacallit and sm.whatchamacallit.isNamed(asHarvest.uuid, asHarvest.id)) then
+            self:client_setTitleLabel(sm.whatchamacallit.getName(asHarvest.uuid, asHarvest.id))
+        else
+            self:client_setTitleLabel(self.vanillaHarvestables[tostring(asHarvest.uuid)].name)
+        end
         if (self.vanillaHarvestables[tostring(asHarvest.uuid)].iconUUID) then
             self:client_setPreview(sm.uuid.new(self.vanillaHarvestables[tostring(asHarvest.uuid)].iconUUID))
         end
@@ -1122,7 +1170,7 @@ function WAILA.client_displayPanel(self, raycastResult)
         )
     elseif (math.ceil((os.clock() - startTime) * 1000) >= 50) then
         self:client_showNotification({
-                "Panel update took more time than usual",
+                "Panel update took a lot more time than usual",
                 "Update took: "
                 .. math.ceil((os.clock() - startTime) * 1000) .. "ms",
                 "Target type: " .. self.inspectable[self.current.type]
